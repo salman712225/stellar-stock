@@ -1,0 +1,34 @@
+# Python dependencies
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Node / JS dependencies
+node_modules/
+dist/
+build/
+.eslintcache
+
+# Project Caches & Database
+backend/data_cache/
+backend/models/*.pkl
+*.log
+
+# Sensitive Files
+.env
+.env.*
+secrets.json
+
+# Editors
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
