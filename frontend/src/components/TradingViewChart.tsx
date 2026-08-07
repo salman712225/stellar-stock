@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
-import { createChart, IChartApi, ISeriesApi, UTCTimestamp, SeriesMarker } from "lightweight-charts";
+import { createChart, CandlestickSeries, LineSeries, HistogramSeries, createSeriesMarkers } from "lightweight-charts";
+import type { IChartApi, ISeriesApi, UTCTimestamp, SeriesMarker } from "lightweight-charts";
 
 interface CandleData {
   datetime: string;
@@ -95,7 +96,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({ candles, sym
     });
 
     // 4. Create series
-    const candSeries = priceChart.addCandlestickSeries({
+    const candSeries = priceChart.addSeries(CandlestickSeries, {
       upColor: "#089981",
       downColor: "#f23645",
       borderVisible: false,
@@ -104,19 +105,19 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({ candles, sym
     });
     candSeriesRef.current = candSeries;
 
-    const ema9Series = priceChart.addLineSeries({ color: "#2196F3", lineWidth: 1.5, title: "EMA 9" });
+    const ema9Series = priceChart.addSeries(LineSeries, { color: "#2196F3", lineWidth: 2, title: "EMA 9" });
     ema9SeriesRef.current = ema9Series;
 
-    const ema21Series = priceChart.addLineSeries({ color: "#FF9800", lineWidth: 1.5, title: "EMA 21" });
+    const ema21Series = priceChart.addSeries(LineSeries, { color: "#FF9800", lineWidth: 2, title: "EMA 21" });
     ema21SeriesRef.current = ema21Series;
 
-    const stSeries = priceChart.addLineSeries({ color: "#E040FB", lineWidth: 1.5, lineStyle: 2, title: "Supertrend" });
+    const stSeries = priceChart.addSeries(LineSeries, { color: "#E040FB", lineWidth: 2, lineStyle: 2, title: "Supertrend" });
     stSeriesRef.current = stSeries;
 
-    const rfSeries = priceChart.addLineSeries({ color: "#FFCA28", lineWidth: 1.5, title: "Range Filter" });
+    const rfSeries = priceChart.addSeries(LineSeries, { color: "#FFCA28", lineWidth: 2, title: "Range Filter" });
     rfSeriesRef.current = rfSeries;
 
-    const volSeries = volumeChart.addHistogramSeries({
+    const volSeries = volumeChart.addSeries(HistogramSeries, {
       color: "#26a69a",
       priceFormat: { type: "volume" },
     });
@@ -172,14 +173,13 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({ candles, sym
       }
     });
     if (markers.length > 0) {
-      candSeries.setMarkers(markers);
+      createSeriesMarkers(candSeries, markers);
     }
 
     // Fit content
     priceChart.timeScale().fitContent();
 
     // 7. WebSocket Live Updates Listener
-    const cleanSym = symbol.replace("/", "_").replace("^", "IDX_");
     const wsUrl = `ws://localhost:8000/api/ws/${symbol}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

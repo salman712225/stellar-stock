@@ -149,49 +149,54 @@ def evaluate_position(
     elif position_type.lower() in ["short", "put"] and ml_sig == "SELL":
         ml_aligned = True
 
-    # 5. Recommendation engine
+    # 5. Priority-Based Rule Engine
     action = "HOLD"
-    rationale = []
+    rationale_list = []
     
-    # Check Stop Loss / Target Hits
+    # Priority 1 & 2: Stop Loss & Limit Exit Check
+    is_stop_loss_breached = False
     if position_type.lower() in ["long", "call"]:
         if spot_price <= stop_loss:
-            action = "EXIT NOW"
-            rationale.append("Stop Loss level breached on the underlying asset.")
-        elif spot_price >= limit_price:
-            action = "TAKE PROFIT"
-            rationale.append("Limit exit target reached.")
+            is_stop_loss_breached = True
     else:
         if spot_price >= stop_loss:
-            action = "EXIT NOW"
-            rationale.append("Stop Loss level breached on the underlying asset.")
-        elif spot_price <= limit_price:
-            action = "TAKE PROFIT"
-            rationale.append("Limit exit target reached.")
+            is_stop_loss_breached = True
             
-    # Conditional logic based on indicators and roadblocks
-    if action == "HOLD":
-        # Check roadblock density
-        if len(roadblocks) >= 2:
-            action = "EXIT NOW" if pnl_pct > 0 else "TAKE PROFIT (REDUCED TARGET)"
-            rationale.append(f"Multiple institutional resistance levels ({len(roadblocks)}) block the exit path. Suggest exiting/reducing target to secure current PnL.")
-            
-        # Check Option time decay (Theta)
-        if is_option and option_greeks:
-            theta = option_greeks.get("theta", 0.0)
-            # If theta erosion is high (close to expiry) and spot is sideways
-            if abs(theta) > 0.02 * entry_price and not ml_aligned:
-                action = "EXIT NOW"
-                rationale.append("Time decay (Theta) is rapidly eroding option premium value while underlying price consolidates.")
-                
-        # Check ML model conflict
+    is_limit_reached = False
+    if position_type.lower() in ["long", "call"]:
+        if spot_price >= limit_price:
+            is_limit_reached = True
+    else:
+        if spot_price <= limit_price:
+            is_limit_reached = True
+
+    if is_stop_loss_breached:
+        action = "EXIT NOW"
+        rationale_list.append(f"CRITICAL RISK: Stop loss level of ${stop_loss:,.2f} breached (Spot: ${spot_price:,.2f}).")
+    elif is_limit_reached:
+        action = "TAKE PROFIT"
+        rationale_list.append(f"TARGET ACHIEVED: Profit exit target of ${limit_price:,.2f} reached (Spot: ${spot_price:,.2f}).")
+    else:
+        # Priority 3: ML Forecast Trend Reversal
         if ml_sig != "HOLD" and not ml_aligned and ml_conf > 0.58:
             action = "EXIT NOW" if pnl_pct > -3 else "HOLD"
-            rationale.append(f"Machine learning model forecast has flipped to a high-confidence {ml_sig} signal, creating direction conflict.")
-            
-        # Support Buy Zone check (Average Down suggestion)
-        if position_type.lower() in ["long", "call"] and pnl_pct < -5.0:
-            # Check if price hit a major unmitigated bullish order block
+            rationale_list.append(f"ML REVERSAL: High-confidence ({ml_conf*100:.0f}%) ML signal flipped to {ml_sig}. Direction conflict detected.")
+        
+        # Priority 4: Option Theta Decay
+        elif is_option and option_greeks:
+            theta = option_greeks.get("theta", 0.0)
+            if abs(theta) > 0.02 * entry_price and not ml_aligned:
+                action = "EXIT NOW"
+                rationale_list.append(f"THETA DECAY: Time decay rate ({abs(theta):.4f}/day) is eroding option premium while underlying is consolidating.")
+                
+        # Priority 5: Technical Roadblocks
+        elif len(roadblocks) >= 2:
+            action = "EXIT NOW" if pnl_pct > 0 else "TAKE PROFIT (REDUCED TARGET)"
+            block_type = "resistance" if position_type.lower() in ["long", "call"] else "support"
+            rationale_list.append(f"ROADBLOCKS AHEAD: {len(roadblocks)} institutional {block_type} areas block target path. Suggest securing PnL.")
+
+        # Priority 6: Average Down Opportunity
+        elif position_type.lower() in ["long", "call"] and pnl_pct < -5.0:
             near_support = False
             if smc_data:
                 for ob in smc_data.get("order_blocks", []):
@@ -201,22 +206,24 @@ def evaluate_position(
                             break
             if near_support and ml_sig == "BUY":
                 action = "AVERAGE DOWN"
-                rationale.append("Asset is trading inside an unmitigated bullish Order Block zone. ML model is bullish; favorable risk-reward zone to average down.")
+                rationale_list.append("AVERAGE DOWN: Price testing an unmitigated bullish Order Block with supportive bullish ML forecast.")
 
-    if not rationale:
+    # Priority 7: Trend continuity (general hold)
+    if not rationale_list:
         action = "HOLD"
-        rationale.append("Position remains healthy. Asset price trend is aligned, and no immediate institutional roadblocks were detected.")
+        rationale_list.append("TREND ALIGNED: Trend structure is healthy. No key institutional roadblocks detected between spot and target.")
 
     # Target progress %
     total_range = abs(limit_price - entry_price)
     current_dist = abs(spot_price - entry_price)
     progress_pct = min(100.0, max(0.0, (current_dist / total_range) * 100.0)) if total_range > 0 else 0.0
     if pnl_pct < 0:
-        progress_pct = 0.0 # no target progress if trade is in loss
+        progress_pct = 0.0
 
     # Calculate simple advice (Keep it / Sell it)
-    # If the action suggests exiting, or ML predicts DOWN/SELL with confidence, or stop loss hit
-    if action in ["EXIT NOW", "TAKE PROFIT"] or (prediction and prediction.get("signal") == "SELL" and prediction.get("confidence", 0.5) > 0.55):
+    if action in ["EXIT NOW", "TAKE PROFIT", "TAKE PROFIT (REDUCED TARGET)"]:
+        simple_advice = "Sell it"
+    elif prediction and prediction.get("signal") == "SELL" and prediction.get("confidence", 0.5) > 0.55:
         simple_advice = "Sell it"
     else:
         simple_advice = "Keep it"
@@ -230,7 +237,7 @@ def evaluate_position(
         "roadblocks": roadblocks,
         "ml_aligned": ml_aligned,
         "action": action,
-        "rationale": " ".join(rationale),
+        "rationale": " ".join(rationale_list),
         "target_progress_pct": round(progress_pct, 1),
         "spot_price": spot_price,
         "simple_advice": simple_advice

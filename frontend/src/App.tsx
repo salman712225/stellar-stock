@@ -1,22 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { 
-  TrendingUp, 
-  Layers, 
-  Calculator, 
-  Play, 
-  Plus, 
-  Trash2, 
-  RefreshCw, 
-  Bell, 
-  Sparkles,
-  ArrowUpRight,
-  ShieldAlert,
-  Flame,
-  CheckCircle2,
-  FileText
-} from "lucide-react";
-import { TradingViewChart } from "./components/TradingViewChart";
-import { ConsensusGauge } from "./components/ConsensusGauge";
+import { TrendingUp, Layers, RefreshCw } from "lucide-react";
+import { TerminalTab } from "./components/TerminalTab";
+import { HoldingsTab } from "./components/HoldingsTab";
+import { AddPositionForm } from "./components/AddPositionForm";
 
 // Interfaces
 interface Position {
@@ -100,7 +86,6 @@ export default function App() {
 
   // Options Chains ATM display
   const [chainData, setChainData] = useState<any>(null);
-  const [loadingChain, setLoadingChain] = useState(false);
 
   // Backtest simulation metrics
   const [backtestMetrics, setBacktestMetrics] = useState<any>(null);
@@ -126,7 +111,6 @@ export default function App() {
       setAnalysisData(data);
       if (data.current_price) {
         setCalcEntry(data.current_price);
-        // Default SL: 2 ATR below entry for Buy
         const atr = data.indicators?.latest?.atr_14 || (data.current_price * 0.02);
         setCalcSL(data.current_price - 2 * atr);
       }
@@ -139,7 +123,6 @@ export default function App() {
 
   // 2. Fetch Options chains metrics
   const fetchOptionsChain = async (symbol: string) => {
-    setLoadingChain(true);
     setChainData(null);
     try {
       const res = await fetch(`${API_URL}/api/options-chain?symbol=${encodeURIComponent(symbol)}`);
@@ -149,8 +132,6 @@ export default function App() {
       }
     } catch (err) {
       console.error(err);
-    } finally {
-      setLoadingChain(false);
     }
   };
 
@@ -161,13 +142,11 @@ export default function App() {
       const res = await fetch(`${API_URL}/api/signals-scan`);
       if (res.ok) {
         const data = await res.json();
-        // Check for new signals
         const existing = new Set(alerts.map(a => `${a.symbol}_${a.signal}`));
         const newAlerts: Alert[] = [];
         data.forEach((alert: Alert) => {
           if (!existing.has(`${alert.symbol}_${alert.signal}`)) {
             newAlerts.push(alert);
-            // Push browser notifications using browser Notification API if granted
             if (Notification.permission === "granted") {
               new Notification(`🔔 ${alert.symbol}: ${alert.signal}`, {
                 body: `Range Filter crossover trigger @ $${alert.price.toLocaleString()}`,
@@ -251,7 +230,6 @@ export default function App() {
   // 7. Calculate capital Sizing Planner
   const calculateSizing = () => {
     if (calcEntry <= 0 || calcSL <= 0 || calcEntry === calcSL) return;
-    const isBuy = calcEntry > calcSL;
     const riskPerUnit = Math.abs(calcEntry - calcSL);
     const capitalAtRisk = balance * (riskPercent / 100);
     const rawUnits = capitalAtRisk / riskPerUnit;
@@ -273,8 +251,6 @@ export default function App() {
     if (Notification.permission === "default") {
       Notification.requestPermission();
     }
-    
-    // Initial scan and sets timer
     scanSignals();
     const alertTimer = setInterval(scanSignals, 45000);
     return () => clearInterval(alertTimer);
@@ -334,7 +310,6 @@ export default function App() {
     };
 
     setTrackedPositions(prev => [...prev, newPos]);
-    // reset form
     setFormSymbol("");
     setFormStrike("");
     setFormEntry("");
@@ -428,56 +403,6 @@ export default function App() {
 
           <hr style={{ border: "0", borderTop: "1px solid #2a2e39", margin: "16px 0" }} />
 
-          {/* Sizing Parameters */}
-          <h3 style={{ fontSize: "11px", color: "#787b86", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "12px" }}>
-            Sizing Metrics Configuration
-          </h3>
-          
-          <div className="form-group">
-            <label>Balance ($)</label>
-            <input 
-              type="number" 
-              className="form-input" 
-              value={balance}
-              onChange={(e) => setBalance(parseFloat(e.target.value) || 10000)}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Max Risk: {riskPercent}%</label>
-            <input 
-              type="range" 
-              min="0.1" 
-              max="5.0" 
-              step="0.1" 
-              value={riskPercent}
-              style={{ width: "100%" }}
-              onChange={(e) => setRiskPercent(parseFloat(e.target.value) || 1.0)}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Leverage Factor (x)</label>
-            <input 
-              type="number" 
-              className="form-input" 
-              value={leverage}
-              onChange={(e) => setLeverage(parseFloat(e.target.value) || 1.0)}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Target R:R ratio</label>
-            <input 
-              type="number" 
-              className="form-input" 
-              value={rrRatio}
-              onChange={(e) => setRrRatio(parseFloat(e.target.value) || 2.0)}
-            />
-          </div>
-
-          <hr style={{ border: "0", borderTop: "1px solid #2a2e39", margin: "16px 0" }} />
-
           {/* Live Alerts feed */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
             <span style={{ fontSize: "11px", color: "#787b86", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
@@ -493,7 +418,7 @@ export default function App() {
             </button>
           </div>
 
-          <div style={{ maxHeight: "200px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "5px" }}>
+          <div style={{ maxHeight: "250px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "5px" }}>
             {alerts.length === 0 ? (
               <div style={{ color: "#787b86", fontSize: "11px", textAlign: "center", padding: "10px 0" }}>
                 No active Range Filter triggers detected.
@@ -543,475 +468,59 @@ export default function App() {
         </header>
 
         {activeTab === "terminal" ? (
-          /* ==================================================== */
-          /* TERMINAL TAB SCREEN                                  */
-          /* ==================================================== */
-          <div className="workspace-content">
-            {isLoading ? (
-              <div style={{ textAlign: "center", padding: "100px 0", color: "#787b86" }}>
-                <RefreshCw className="spin" size={32} style={{ marginBottom: "10px" }} />
-                <div>Fetching market structures, sentiment arrays, and ML models...</div>
-              </div>
-            ) : errorMsg ? (
-              <div style={{ padding: "40px", backgroundColor: "rgba(242, 54, 69, 0.1)", borderRadius: "6px", border: "1px solid #f23645", color: "#f23645" }}>
-                <strong>Error:</strong> {errorMsg}
-                <button className="btn-primary" style={{ marginTop: "15px", width: "auto" }} onClick={() => fetchAnalysis(activeSymbol, timeframe)}>
-                  Retry Request
-                </button>
-              </div>
-            ) : analysisData ? (
-              <div className="split-layout">
-                {/* Left side: Interactive Candlestick charts */}
-                <div className="split-left">
-                  <div className="tv-panel" style={{ padding: "8px" }}>
-                    <div className="tv-panel-header" style={{ padding: "8px 12px 0 12px", borderBottom: "none" }}>
-                      <span>📈 PRICE CHART & RANGE FILTER OVERLAYS</span>
-                      <span style={{ color: "#787b86", fontSize: "10px" }}>Websocket Connected</span>
-                    </div>
-                    {analysisData.chart_data && (
-                      <TradingViewChart candles={analysisData.chart_data} symbol={activeSymbol} />
-                    )}
-                  </div>
-
-                  {/* Sub Panel with analysis tools */}
-                  <div className="tv-panel">
-                    <div className="tv-panel-header">
-                      <span>🧠 AI ANALYST RESEARCH LOG REPORT</span>
-                      <span style={{ color: "#2962ff", display: "flex", alignItems: "center", gap: "4px" }}>
-                        <Sparkles size={11} /> Calibrated Forecast
-                      </span>
-                    </div>
-                    <div className="report-markdown" dangerouslySetInnerHTML={{ __html: analysisData.report?.replace(/\n/g, "<br/>") || "" }} />
-                  </div>
-                </div>
-
-                {/* Right side: TradingView style scorecards & gauge dial */}
-                <div className="split-right">
-                  {/* Gauge indicator widget */}
-                  <div className="tv-panel" style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                    <div className="tv-panel-header" style={{ width: "100%" }}>
-                      <span>🎯 Technical Consensus Speedometer</span>
-                    </div>
-                    {(() => {
-                      const latest = analysisData.indicators?.latest || {};
-                      const sig = analysisData.prediction?.signal || "HOLD";
-                      const pcr = chainData?.pcr_oi || 1.0;
-                      const rsi = latest.rsi_14 || 50;
-                      const score = analysisData.sentiment?.score || 0;
-
-                      // Gauge Rating Calculation
-                      let rating = 50;
-                      if (latest.direction === 1) rating += 15; else rating -= 15;
-                      if (latest.range_direction === 1) rating += 15; else rating -= 15;
-                      if (rsi > 55) rating += 10; else if (rsi < 45) rating -= 10;
-                      if (latest.macd_hist > 0) rating += 10; else rating -= 10;
-                      if (score > 0.15) rating += 10; else if (score < -0.15) rating -= 10;
-                      if (sig === "BUY") rating += 20; else if (sig === "SELL") rating -= 20;
-
-                      rating = Math.max(5, Math.min(95, rating));
-                      let conLabel = "NEUTRAL";
-                      let conColor = "#787b86";
-
-                      if (rating >= 70) { conLabel = "STRONG BUY"; conColor = "#089981"; }
-                      else if (rating >= 55) { conLabel = "BUY"; conColor = "#26a69a"; }
-                      else if (rating <= 30) { conLabel = "STRONG SELL"; conColor = "#f23645"; }
-                      else if (rating <= 45) { conLabel = "SELL"; conColor = "#ff5252"; }
-
-                      return (
-                        <ConsensusGauge value={rating} label={conLabel} color={conColor} />
-                      );
-                    })()}
-                  </div>
-
-                  {/* Core specs scorecards */}
-                  <div className="tv-panel">
-                    <div className="tv-panel-header">
-                      <span>📊 Asset Scorecards</span>
-                    </div>
-                    <div className="tv-scorecard">
-                      <div className="tv-scorecard-label">Last Traded price</div>
-                      <div className="tv-scorecard-value">
-                        ${analysisData.current_price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
-                      </div>
-                      <div className="tv-scorecard-sub">Active Feed Price</div>
-                    </div>
-
-                    <div className="tv-scorecard">
-                      <div className="tv-scorecard-label">AI Forecast (ML Calibrated)</div>
-                      <div style={{ marginTop: "4px" }}>
-                        <span className={analysisData.prediction?.signal === "BUY" ? "badge-buy" : analysisData.prediction?.signal === "SELL" ? "badge-sell" : "badge-hold"}>
-                          {analysisData.prediction?.signal || "HOLD"} ({((analysisData.prediction?.confidence || 0.5) * 100).toFixed(0)}% Conv)
-                        </span>
-                      </div>
-                      <div className="tv-scorecard-sub">Next-period direction skew</div>
-                    </div>
-
-                    <div className="tv-scorecard">
-                      <div className="tv-scorecard-label">Overall sentiment</div>
-                      <div style={{ marginTop: "4px" }}>
-                        <span className={analysisData.sentiment?.label === "bullish" ? "badge-buy" : analysisData.sentiment?.label === "bearish" ? "badge-sell" : "badge-hold"}>
-                          {analysisData.sentiment?.label?.toUpperCase() || "NEUTRAL"} ({analysisData.sentiment?.score})
-                        </span>
-                      </div>
-                      <div className="tv-scorecard-sub">News & forums aggregated sentiment</div>
-                    </div>
-                  </div>
-
-                  {/* Sizing calculation scorecard */}
-                  <div className="tv-panel">
-                    <div className="tv-panel-header">
-                      <span>🧮 Capital Sizing Planner</span>
-                    </div>
-                    
-                    <div className="form-group">
-                      <label>Trade Entry price ($)</label>
-                      <input 
-                        type="number" 
-                        className="form-input" 
-                        value={calcEntry}
-                        onChange={(e) => setCalcEntry(parseFloat(e.target.value) || 0)}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Trade Stop Loss ($)</label>
-                      <input 
-                        type="number" 
-                        className="form-input" 
-                        value={calcSL}
-                        onChange={(e) => setCalcSL(parseFloat(e.target.value) || 0)}
-                      />
-                    </div>
-
-                    {calcResult && (
-                      <div style={{ marginTop: "12px", borderTop: "1px solid #2a2e39", paddingTop: "12px", display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px" }}>
-                        <div className="p-flex-between">
-                          <span style={{ color: "#787b86" }}>Risk per Unit:</span>
-                          <strong>${calcResult.riskPerUnit.toFixed(2)}</strong>
-                        </div>
-                        <div className="p-flex-between">
-                          <span style={{ color: "#787b86" }}>Total cash at Risk:</span>
-                          <strong style={{ color: "#f23645" }}>${calcResult.capitalAtRisk.toFixed(2)}</strong>
-                        </div>
-                        <div className="p-flex-between">
-                          <span style={{ color: "#787b86" }}>Calculated Units:</span>
-                          <strong>{calcResult.units.toFixed(4)}</strong>
-                        </div>
-                        <div className="p-flex-between">
-                          <span style={{ color: "#787b86" }}>Margin required:</span>
-                          <strong style={{ color: "#089981" }}>${calcResult.marginRequired.toFixed(2)}</strong>
-                        </div>
-                        <div className="p-flex-between">
-                          <span style={{ color: "#787b86" }}>Purchase value:</span>
-                          <strong>${calcResult.purchaseValue.toFixed(2)}</strong>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Options derivatives info if present */}
-                  {!cryptoPresets.includes(activeSymbol) && chainData && (
-                    <div className="tv-panel">
-                      <div className="tv-panel-header">
-                        <span>📊 ATM Options Chain</span>
-                      </div>
-                      <div style={{ fontSize: "11px", display: "flex", flexDirection: "column", gap: "6px" }}>
-                        <div className="p-flex-between">
-                          <span style={{ color: "#787b86" }}>Put-Call Ratio (OI):</span>
-                          <strong>{chainData.pcr_oi?.toFixed(2)}</strong>
-                        </div>
-                        <div className="p-flex-between">
-                          <span style={{ color: "#787b86" }}>PCR (Volume):</span>
-                          <strong>{chainData.pcr_volume?.toFixed(2)}</strong>
-                        </div>
-                        <div className="p-flex-between">
-                          <span style={{ color: "#787b86" }}>Max Pain Strike:</span>
-                          <strong style={{ color: "#FF9800" }}>${chainData.max_pain?.toFixed(2)}</strong>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Backtest Strategy Simulator */}
-                  <div className="tv-panel">
-                    <div className="tv-panel-header">
-                      <span>🔄 Strategy Backtester Simulator</span>
-                    </div>
-                    <button 
-                      className="btn-primary" 
-                      onClick={runBacktest}
-                      disabled={runningBacktest}
-                      style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
-                    >
-                      <Play size={13} fill="white" /> {runningBacktest ? "Simulating Strategy..." : "Run SMC Backtest"}
-                    </button>
-
-                    {backtestMetrics && (
-                      <div style={{ marginTop: "12px", borderTop: "1px solid #2a2e39", paddingTop: "12px", display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px" }}>
-                        <div className="p-flex-between">
-                          <span style={{ color: "#787b86" }}>Win Rate:</span>
-                          <strong style={{ color: "#089981" }}>{backtestMetrics.metrics?.win_rate_pct}%</strong>
-                        </div>
-                        <div className="p-flex-between">
-                          <span style={{ color: "#787b86" }}>Net Return:</span>
-                          <strong style={{ color: backtestMetrics.metrics?.total_return_pct >= 0 ? "#089981" : "#f23645" }}>
-                            {backtestMetrics.metrics?.total_return_pct >= 0 ? "+" : ""}{backtestMetrics.metrics?.total_return_pct}%
-                          </strong>
-                        </div>
-                        <div className="p-flex-between">
-                          <span style={{ color: "#787b86" }}>Profit Factor:</span>
-                          <strong>{backtestMetrics.metrics?.profit_factor}</strong>
-                        </div>
-                        <div className="p-flex-between">
-                          <span style={{ color: "#787b86" }}>Max Drawdown:</span>
-                          <strong style={{ color: "#f23645" }}>{backtestMetrics.metrics?.max_drawdown_pct}%</strong>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div style={{ textAlign: "center", padding: "100px 0", color: "#787b86" }}>
-                Select preset symbol on the left to pull live metrics.
-              </div>
-            )}
-          </div>
+          <TerminalTab
+            isLoading={isLoading}
+            errorMsg={errorMsg}
+            analysisData={analysisData}
+            activeSymbol={activeSymbol}
+            timeframe={timeframe}
+            fetchAnalysis={fetchAnalysis}
+            cryptoPresets={cryptoPresets}
+            chainData={chainData}
+            backtestMetrics={backtestMetrics}
+            runningBacktest={runningBacktest}
+            runBacktest={runBacktest}
+            balance={balance}
+            setBalance={setBalance}
+            riskPercent={riskPercent}
+            setRiskPercent={setRiskPercent}
+            leverage={leverage}
+            setLeverage={setLeverage}
+            rrRatio={rrRatio}
+            setRrRatio={setRrRatio}
+            calcEntry={calcEntry}
+            setCalcEntry={setCalcEntry}
+            calcSL={calcSL}
+            setCalcSL={setCalcSL}
+            calcResult={calcResult}
+          />
         ) : (
-          /* ==================================================== */
-          /* ACTIVE HOLDINGS TRACKER TAB                          */
-          /* ==================================================== */
-          <div className="workspace-content">
-            <div className="split-layout">
-              {/* Left Side: Tracked positions cards list */}
-              <div className="split-left">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                  <h3 style={{ margin: 0, color: "#f0f3fa", fontSize: "16px" }}>Tracked Holdings Portfolio</h3>
-                  <button className="btn-secondary" onClick={evaluateAllPositions} disabled={evaluatingAll}>
-                    <RefreshCw size={12} className={evaluatingAll ? "spin" : ""} style={{ marginRight: "6px" }} />
-                    Re-evaluate Holdings
-                  </button>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                  {trackedPositions.length === 0 ? (
-                    <div className="tv-panel" style={{ textAlign: "center", color: "#787b86", padding: "40px" }}>
-                      No holdings currently tracked. Use the right form to register active positions!
-                    </div>
-                  ) : (
-                    trackedPositions.map((pos) => {
-                      const evalRes = evaluationResults[pos.id];
-                      const advice = evalRes?.simple_advice || "Keep it";
-                      
-                      return (
-                        <div key={pos.id} className="tv-panel" style={{ position: "relative" }}>
-                          {/* Glowing Advice Banner */}
-                          {evalRes ? (
-                            advice === "Keep it" ? (
-                              <div className="glowing-card-keep">
-                                <h4 style={{ margin: 0, fontSize: "15px", display: "flex", alignItems: "center", gap: "8px" }}>
-                                  <CheckCircle2 size={16} /> DIRECTIVE: KEEP IT (📈 Predict Rise / Continuation)
-                                </h4>
-                              </div>
-                            ) : (
-                              <div className="glowing-card-sell">
-                                <h4 style={{ margin: 0, fontSize: "15px", display: "flex", alignItems: "center", gap: "8px" }}>
-                                  <ShieldAlert size={16} /> DIRECTIVE: SELL IT (📉 Predict Drop / Risk Exit)
-                                </h4>
-                              </div>
-                            )
-                          ) : (
-                            <div style={{ backgroundColor: "#1c2030", padding: "12px", borderRadius: "6px", color: "#787b86", marginBottom: "12px", fontSize: "12px" }}>
-                              Evaluating active pricing...
-                            </div>
-                          )}
-
-                          <div className="p-flex-between" style={{ borderBottom: "1px solid #2a2e39", paddingBottom: "10px", marginBottom: "12px" }}>
-                            <div>
-                              <span style={{ fontSize: "16px", fontWeight: 700, color: "#f0f3fa", marginRight: "8px" }}>
-                                {pos.symbol}
-                              </span>
-                              <span className={pos.type === "long" || pos.type === "call" ? "badge-buy" : "badge-sell"}>
-                                {pos.type.toUpperCase()}
-                              </span>
-                              {pos.strike && (
-                                <span style={{ color: "#787b86", fontSize: "11px", marginLeft: "10px" }}>
-                                  Strike: ${pos.strike}
-                                </span>
-                              )}
-                            </div>
-                            <button 
-                              className="btn-secondary" 
-                              style={{ color: "#f23645", borderColor: "rgba(242, 54, 69, 0.2)", display: "flex", alignItems: "center", padding: "4px 8px" }}
-                              onClick={() => handleRemovePosition(pos.id)}
-                            >
-                              <Trash2 size={12} style={{ marginRight: "4px" }} /> Delete
-                            </button>
-                          </div>
-
-                          <div className="p-grid-2">
-                            {/* Position Details */}
-                            <div style={{ fontSize: "13px", display: "flex", flexDirection: "column", gap: "6px" }}>
-                              <div className="p-flex-between">
-                                <span style={{ color: "#787b86" }}>Entry price:</span>
-                                <strong>${pos.entry.toLocaleString()}</strong>
-                              </div>
-                              <div className="p-flex-between">
-                                <span style={{ color: "#787b86" }}>Limit Target:</span>
-                                <strong>${pos.limit.toLocaleString()}</strong>
-                              </div>
-                              <div className="p-flex-between">
-                                <span style={{ color: "#787b86" }}>Stop Loss:</span>
-                                <strong>${pos.sl.toLocaleString()}</strong>
-                              </div>
-                              <div className="p-flex-between">
-                                <span style={{ color: "#787b86" }}>Timeframe:</span>
-                                <strong>{pos.timeframe}</strong>
-                              </div>
-                            </div>
-
-                            {/* Position Evaluation outputs */}
-                            {evalRes && (
-                              <div style={{ fontSize: "13px", display: "flex", flexDirection: "column", gap: "6px", borderLeft: "1px solid #2a2e39", paddingLeft: "16px" }}>
-                                <div className="p-flex-between">
-                                  <span style={{ color: "#787b86" }}>Current Spot:</span>
-                                  <strong>${evalRes.spot_price?.toLocaleString()}</strong>
-                                </div>
-                                <div className="p-flex-between">
-                                  <span style={{ color: "#787b86" }}>PnL Net:</span>
-                                  <strong style={{ color: evalRes.pnl_percentage >= 0 ? "#089981" : "#f23645" }}>
-                                    {evalRes.pnl_percentage >= 0 ? "+" : ""}{evalRes.pnl_percentage}%
-                                  </strong>
-                                </div>
-                                <div className="p-flex-between">
-                                  <span style={{ color: "#787b86" }}>ML Alignment:</span>
-                                  <strong>{evalRes.ml_aligned ? "Aligned 🟢" : "Conflict ⚠️"}</strong>
-                                </div>
-                                <div className="p-flex-between" style={{ flexDirection: "column", alignItems: "flex-start", gap: "4px" }}>
-                                  <span style={{ color: "#787b86" }}>Rationale:</span>
-                                  <p style={{ margin: 0, fontSize: "11px", color: "#d1d4dc", lineHeight: "1.4" }}>
-                                    {evalRes.rationale}
-                                  </p>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* Right Side: Track new holding registration form */}
-              <div className="split-right">
-                <div className="tv-panel">
-                  <div className="tv-panel-header">
-                    <span>➕ Track New Position</span>
-                  </div>
-
-                  <form onSubmit={handleAddPosition} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                    <div className="form-group">
-                      <label>Asset Symbol</label>
-                      <input 
-                        type="text" 
-                        className="form-input" 
-                        required 
-                        placeholder="e.g. BTC/USDT, TSLA"
-                        value={formSymbol}
-                        onChange={(e) => setFormSymbol(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Position type</label>
-                      <select 
-                        className="form-select"
-                        value={formType}
-                        onChange={(e) => setFormType(e.target.value as Position["type"])}
-                      >
-                        <option value="long">Long</option>
-                        <option value="short">Short</option>
-                        <option value="call">Call Option</option>
-                        <option value="put">Put Option</option>
-                      </select>
-                    </div>
-
-                    {(formType === "call" || formType === "put") && (
-                      <div className="form-group">
-                        <label>Strike price ($)</label>
-                        <input 
-                          type="number" 
-                          className="form-input" 
-                          placeholder="e.g. 220"
-                          value={formStrike}
-                          onChange={(e) => setFormStrike(e.target.value)}
-                        />
-                      </div>
-                    )}
-
-                    <div className="form-group">
-                      <label>Entry price ($)</label>
-                      <input 
-                        type="number" 
-                        step="0.0001" 
-                        className="form-input" 
-                        required
-                        placeholder="e.g. 63000"
-                        value={formEntry}
-                        onChange={(e) => setFormEntry(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Exit Limit Target ($)</label>
-                      <input 
-                        type="number" 
-                        step="0.0001" 
-                        className="form-input" 
-                        required
-                        placeholder="e.g. 66000"
-                        value={formLimit}
-                        onChange={(e) => setFormLimit(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Stop Loss ($)</label>
-                      <input 
-                        type="number" 
-                        step="0.0001" 
-                        className="form-input" 
-                        required
-                        placeholder="e.g. 61500"
-                        value={formSl}
-                        onChange={(e) => setFormSl(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Scan Timeframe</label>
-                      <select 
-                        className="form-select"
-                        value={formTf}
-                        onChange={(e) => setFormTf(e.target.value)}
-                      >
-                        <option value="5m">5m</option>
-                        <option value="15m">15m</option>
-                        <option value="1h">1h</option>
-                        <option value="4h">4h</option>
-                        <option value="1d">1d</option>
-                      </select>
-                    </div>
-
-                    <button type="submit" className="btn-primary" style={{ marginTop: "10px" }}>
-                      Add Position to Tracker
-                    </button>
-                  </form>
-                </div>
-              </div>
-            </div>
-          </div>
+          <HoldingsTab
+            trackedPositions={trackedPositions}
+            evaluationResults={evaluationResults}
+            evaluatingAll={evaluatingAll}
+            evaluateAllPositions={evaluateAllPositions}
+            handleRemovePosition={handleRemovePosition}
+            addPositionForm={
+              <AddPositionForm
+                formSymbol={formSymbol}
+                setFormSymbol={setFormSymbol}
+                formType={formType}
+                setFormType={setFormType}
+                formStrike={formStrike}
+                setFormStrike={setFormStrike}
+                formEntry={formEntry}
+                setFormEntry={setFormEntry}
+                formLimit={formLimit}
+                setFormLimit={setFormLimit}
+                formSl={formSl}
+                setFormSl={setFormSl}
+                formTf={formTf}
+                setFormTf={setFormTf}
+                onSubmit={handleAddPosition}
+              />
+            }
+          />
         )}
       </main>
     </div>

@@ -179,6 +179,9 @@ async def get_options_chain(symbol: str, expiry: Optional[int] = None):
     if is_crypto:
         raise HTTPException(status_code=400, detail="Options chains are only available for F&O Stocks/Indices (e.g. AAPL, SPY, ^NSEI)")
         
+    chain = await options_data_provider.fetch_options_chain(symbol)
+    if not chain:
+        raise HTTPException(status_code=404, detail=f"No options chain data available for {symbol}")
     return clean_json_data(chain)
 
 @router.post("/api/backtest")
