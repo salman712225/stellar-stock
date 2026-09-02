@@ -16,9 +16,9 @@ NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# Assets defaults
-DEFAULT_CRYPTO_SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "ADA/USDT", "DOT/USDT"]
-DEFAULT_FO_SYMBOLS = ["^NSEI", "^NSEBANK", "RELIANCE.NS", "AAPL", "SPY", "QQQ"]
+# Assets defaults - Primary focus on BTC, ETH, XAUT (Tether Gold)
+DEFAULT_CRYPTO_SYMBOLS = ["BTC/USDT", "ETH/USDT", "XAUT/USDT", "SOL/USDT", "XRP/USDT", "BNB/USDT", "ADA/USDT", "DOGE/USDT"]
+DEFAULT_FO_SYMBOLS = ["^NSEI", "^NSEBANK", "RELIANCE.NS", "AAPL", "SPY", "QQQ", "NVDA", "TSLA"]
 
 # Timeframes & Settings
 DEFAULT_TIMEFRAME = "1h"
@@ -36,3 +36,4 @@ MODEL_DIR.mkdir(exist_ok=True)
 DEFAULT_ACCOUNT_BALANCE = float(os.getenv("DEFAULT_ACCOUNT_BALANCE", "10000.0"))
 DEFAULT_RISK_PERCENT = float(os.getenv("DEFAULT_RISK_PERCENT", "1.0"))  # 1% per trade
 DEFAULT_LEVERAGE = float(os.getenv("DEFAULT_LEVERAGE", "1.0"))
+

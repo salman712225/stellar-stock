@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { TrendingUp, Layers, RefreshCw } from "lucide-react";
+import { TrendingUp, Layers, RefreshCw, Activity, Sparkles, Newspaper } from "lucide-react";
 import { TerminalTab } from "./components/TerminalTab";
+import { AllIndicatorsHub } from "./components/AllIndicatorsHub";
+import { AICopilotTab } from "./components/AICopilotTab";
+import { NewsSentimentTab } from "./components/NewsSentimentTab";
 import { HoldingsTab } from "./components/HoldingsTab";
 import { AddPositionForm } from "./components/AddPositionForm";
 
@@ -23,14 +26,26 @@ interface Alert {
   timestamp: string;
 }
 
+interface TickerItem {
+  symbol: string;
+  price: number;
+  change_pct: number;
+  high: number;
+  low: number;
+  volume: number;
+}
+
 const API_URL = "http://localhost:8000";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"terminal" | "holdings">("terminal");
+  const [activeTab, setActiveTab] = useState<"terminal" | "indicators" | "copilot" | "news" | "holdings">("terminal");
   const [assetClass, setAssetClass] = useState<"Crypto" | "FO">("Crypto");
   const [activeSymbol, setActiveSymbol] = useState("BTC/USDT");
   const [customSymbol, setCustomSymbol] = useState("");
   const [timeframe, setTimeframe] = useState("1h");
+
+  // Top Marquee Ticker
+  const [tickerItems, setTickerItems] = useState<TickerItem[]>([]);
 
   // Default Sizing parameters
   const [balance, setBalance] = useState(10000);
@@ -45,19 +60,29 @@ export default function App() {
       symbol: "BTC/USDT",
       type: "long",
       strike: null,
-      entry: 63000,
-      limit: 66000,
-      sl: 61500,
+      entry: 64200,
+      limit: 67500,
+      sl: 62800,
       timeframe: "1h"
     },
     {
       id: 2,
-      symbol: "AAPL",
-      type: "call",
-      strike: 220,
-      entry: 3.5,
-      limit: 7.0,
-      sl: 1.5,
+      symbol: "ETH/USDT",
+      type: "long",
+      strike: null,
+      entry: 2650,
+      limit: 2850,
+      sl: 2540,
+      timeframe: "1h"
+    },
+    {
+      id: 3,
+      symbol: "XAUT/USDT",
+      type: "long",
+      strike: null,
+      entry: 2510,
+      limit: 2600,
+      sl: 2470,
       timeframe: "1h"
     }
   ]);
@@ -96,17 +121,30 @@ export default function App() {
   const [calcSL, setCalcSL] = useState<number>(0);
   const [calcResult, setCalcResult] = useState<any>(null);
 
-  // Preset symbols
-  const cryptoPresets = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "ADA/USDT", "DOT/USDT"];
-  const foPresets = ["^NSEI", "^NSEBANK", "AAPL", "SPY", "QQQ", "RELIANCE.NS"];
+  // Preset symbols - Showcase BTC, ETH, XAUT
+  const cryptoPresets = ["BTC/USDT", "ETH/USDT", "XAUT/USDT", "SOL/USDT", "XRP/USDT", "BNB/USDT", "ADA/USDT", "DOGE/USDT"];
+  const foPresets = ["^NSEI", "^NSEBANK", "AAPL", "SPY", "QQQ", "NVDA", "TSLA", "RELIANCE.NS"];
 
-  // 1. Fetch live analysis for selected symbol
+  // 1. Fetch Marquee Ticker overview
+  const fetchMarketOverview = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/market-overview`);
+      if (res.ok) {
+        const data = await res.json();
+        setTickerItems(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch market overview:", err);
+    }
+  };
+
+  // 2. Fetch live analysis for selected symbol
   const fetchAnalysis = async (symbol: string, tf: string) => {
     setIsLoading(true);
     setErrorMsg("");
     try {
       const res = await fetch(`${API_URL}/api/analyze?symbol=${encodeURIComponent(symbol)}&timeframe=${tf}`);
-      if (!res.ok) throw new Error("Could not retrieve market analysis");
+      if (!res.ok) throw new Error(`Could not retrieve market analysis for ${symbol}`);
       const data = await res.json();
       setAnalysisData(data);
       if (data.current_price) {
@@ -121,7 +159,7 @@ export default function App() {
     }
   };
 
-  // 2. Fetch Options chains metrics
+  // 3. Fetch Options chains metrics
   const fetchOptionsChain = async (symbol: string) => {
     setChainData(null);
     try {
@@ -135,7 +173,7 @@ export default function App() {
     }
   };
 
-  // 3. Scan Range Filter Signals
+  // 4. Scan Range Filter Signals
   const scanSignals = async () => {
     setIsScanning(true);
     try {
@@ -149,7 +187,7 @@ export default function App() {
             newAlerts.push(alert);
             if (Notification.permission === "granted") {
               new Notification(`🔔 ${alert.symbol}: ${alert.signal}`, {
-                body: `Range Filter crossover trigger @ $${alert.price.toLocaleString()}`,
+                body: `Range Filter trigger @ $${alert.price.toLocaleString()}`,
                 icon: "/favicon.ico"
               });
             }
@@ -167,7 +205,7 @@ export default function App() {
     }
   };
 
-  // 4. Evaluate single tracked holding position
+  // 5. Evaluate single tracked holding position
   const evaluatePosition = async (pos: Position) => {
     try {
       const res = await fetch(`${API_URL}/api/evaluate-position`, {
@@ -192,14 +230,14 @@ export default function App() {
     }
   };
 
-  // 5. Evaluate all holdings
+  // 6. Evaluate all holdings
   const evaluateAllPositions = async () => {
     setEvaluatingAll(true);
     await Promise.all(trackedPositions.map(pos => evaluatePosition(pos)));
     setEvaluatingAll(false);
   };
 
-  // 6. Run backtester simulation
+  // 7. Run backtester simulation
   const runBacktest = async () => {
     setRunningBacktest(true);
     setBacktestMetrics(null);
@@ -227,7 +265,7 @@ export default function App() {
     }
   };
 
-  // 7. Calculate capital Sizing Planner
+  // 8. Calculate capital Sizing Planner
   const calculateSizing = () => {
     if (calcEntry <= 0 || calcSL <= 0 || calcEntry === calcSL) return;
     const riskPerUnit = Math.abs(calcEntry - calcSL);
@@ -246,20 +284,23 @@ export default function App() {
     });
   };
 
-  // Request browser notification permissions on mount
   useEffect(() => {
     if (Notification.permission === "default") {
       Notification.requestPermission();
     }
+    fetchMarketOverview();
     scanSignals();
+    const overviewTimer = setInterval(fetchMarketOverview, 15000);
     const alertTimer = setInterval(scanSignals, 45000);
-    return () => clearInterval(alertTimer);
+    return () => {
+      clearInterval(overviewTimer);
+      clearInterval(alertTimer);
+    };
   }, []);
 
-  // Fetch when symbol/timeframe switches
   useEffect(() => {
     fetchAnalysis(activeSymbol, timeframe);
-    const isCrypto = cryptoPresets.includes(activeSymbol);
+    const isCrypto = cryptoPresets.includes(activeSymbol) || activeSymbol.includes("/");
     if (!isCrypto) {
       fetchOptionsChain(activeSymbol);
     } else {
@@ -267,25 +308,21 @@ export default function App() {
     }
   }, [activeSymbol, timeframe]);
 
-  // Calculate sizing whenever inputs adjust
   useEffect(() => {
     calculateSizing();
   }, [calcEntry, calcSL, balance, riskPercent, leverage]);
 
-  // Evaluate holdings on load or when size modifies
   useEffect(() => {
     if (trackedPositions.length > 0) {
       evaluateAllPositions();
     }
   }, [trackedPositions]);
 
-  // Trigger preset select
   const handlePresetSelect = (sym: string) => {
     setActiveSymbol(sym);
     setCustomSymbol("");
   };
 
-  // Custom search entry
   const handleCustomSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (customSymbol.trim()) {
@@ -293,7 +330,6 @@ export default function App() {
     }
   };
 
-  // Add position handler
   const handleAddPosition = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formSymbol) return;
@@ -317,7 +353,6 @@ export default function App() {
     setFormSl("");
   };
 
-  // Remove position
   const handleRemovePosition = (id: number) => {
     setTrackedPositions(prev => prev.filter(p => p.id !== id));
     setEvaluationResults(prev => {
@@ -333,11 +368,35 @@ export default function App() {
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="live-dot" />
-          <h1 className="sidebar-title">HEDGE-QUANT TERMINAL</h1>
+          <h1 className="sidebar-title">QUANT TERMINAL</h1>
         </div>
 
         <div className="sidebar-scroll">
-          {/* Preset Selectors */}
+          {/* Quick Token Showcase: BTC, ETH, XAUT */}
+          <div className="form-group">
+            <label>⚡ Quick Crypto & Gold Chips</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px", marginBottom: "8px" }}>
+              {["BTC/USDT", "ETH/USDT", "XAUT/USDT"].map((s) => (
+                <button
+                  key={s}
+                  className={`btn-secondary ${activeSymbol === s ? "active" : ""}`}
+                  style={{
+                    borderColor: activeSymbol === s ? "#2962ff" : "#2a2e39",
+                    backgroundColor: activeSymbol === s ? "rgba(41, 98, 255, 0.2)" : "transparent",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    padding: "6px 2px",
+                    color: activeSymbol === s ? "#2962ff" : "#d1d4dc"
+                  }}
+                  onClick={() => handlePresetSelect(s)}
+                >
+                  {s.split("/")[0]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Asset Class Selector */}
           <div className="form-group">
             <label>Asset Class</label>
             <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
@@ -346,14 +405,14 @@ export default function App() {
                 style={{ flex: 1, borderColor: assetClass === "Crypto" ? "#2962ff" : "#2a2e39" }}
                 onClick={() => setAssetClass("Crypto")}
               >
-                Crypto
+                Crypto & Tokens
               </button>
               <button 
                 className={`btn-secondary ${assetClass === "FO" ? "active" : ""}`}
                 style={{ flex: 1, borderColor: assetClass === "FO" ? "#2962ff" : "#2a2e39" }}
                 onClick={() => setAssetClass("FO")}
               >
-                Stocks/FO
+                Stocks / Equities
               </button>
             </div>
           </div>
@@ -373,12 +432,12 @@ export default function App() {
           </div>
 
           <form className="form-group" onSubmit={handleCustomSubmit}>
-            <label>Search Symbol</label>
+            <label>Search Custom Symbol</label>
             <div style={{ display: "flex", gap: "8px" }}>
               <input 
                 type="text" 
                 className="form-input" 
-                placeholder="e.g. BTC/USDT, TSLA"
+                placeholder="e.g. BTC/USDT, XAUT/USDT, AAPL"
                 value={customSymbol}
                 onChange={(e) => setCustomSymbol(e.target.value)}
               />
@@ -387,17 +446,17 @@ export default function App() {
           </form>
 
           <div className="form-group">
-            <label>Timeframe</label>
+            <label>Timeframe Resolution</label>
             <select 
               className="form-select"
               value={timeframe}
               onChange={(e) => setTimeframe(e.target.value)}
             >
-              <option value="5m">5 Minutes</option>
-              <option value="15m">15 Minutes</option>
-              <option value="1h">1 Hour</option>
-              <option value="4h">4 Hours</option>
-              <option value="1d">1 Day</option>
+              <option value="5m">5 Minutes (Scalp)</option>
+              <option value="15m">15 Minutes (Intraday)</option>
+              <option value="1h">1 Hour (Standard)</option>
+              <option value="4h">4 Hours (Swing)</option>
+              <option value="1d">1 Day (Macro Trend)</option>
             </select>
           </div>
 
@@ -406,7 +465,7 @@ export default function App() {
           {/* Live Alerts feed */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
             <span style={{ fontSize: "11px", color: "#787b86", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              🔔 Range Filter Alerts Feed
+              🔔 Range Filter Triggers
             </span>
             <button 
               className="btn-secondary" 
@@ -421,7 +480,7 @@ export default function App() {
           <div style={{ maxHeight: "250px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "5px" }}>
             {alerts.length === 0 ? (
               <div style={{ color: "#787b86", fontSize: "11px", textAlign: "center", padding: "10px 0" }}>
-                No active Range Filter triggers detected.
+                Scanning real-time Range Filter triggers across assets...
               </div>
             ) : (
               alerts.map((alert, idx) => (
@@ -445,11 +504,39 @@ export default function App() {
 
       {/* 2. MAIN APP FRAME */}
       <main className="main-workspace">
+        {/* TOP MARQUEE TICKER BAR */}
+        <div className="marquee-container">
+          <span style={{ fontSize: "11px", fontWeight: 700, color: "#2962ff", display: "flex", alignItems: "center", gap: "4px" }}>
+            ⚡ LIVE TICKERS:
+          </span>
+          {tickerItems.length > 0 ? (
+            tickerItems.map((t) => {
+              const isPositive = t.change_pct >= 0;
+              return (
+                <div
+                  key={t.symbol}
+                  className={`marquee-item ${activeSymbol === t.symbol ? "active" : ""}`}
+                  onClick={() => handlePresetSelect(t.symbol)}
+                >
+                  <strong style={{ color: "#fff" }}>{t.symbol}</strong>
+                  <span style={{ fontFamily: "monospace" }}>${t.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
+                  <span style={{ color: isPositive ? "#089981" : "#f23645", fontWeight: "bold", fontSize: "11px" }}>
+                    {isPositive ? "+" : ""}{t.change_pct}%
+                  </span>
+                </div>
+              );
+            })
+          ) : (
+            <div style={{ fontSize: "11px", color: "#787b86" }}>Loading live prices for BTC, ETH, XAUT, SOL, XRP...</div>
+          )}
+        </div>
+
+        {/* WORKSPACE HEADER WITH NAVIGATION TABS */}
         <header className="workspace-header">
           <div className="workspace-header-title">
-            Active: <span style={{ color: "#2962ff" }}>{activeSymbol}</span> ({timeframe}) | Live Streaming Feed
+            Asset: <span style={{ color: "#2962ff", fontWeight: 700 }}>{activeSymbol}</span> ({timeframe}) | Spot: <strong style={{ color: "#00E676" }}>${analysisData?.current_price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) || "..."}</strong>
           </div>
-          <div style={{ display: "flex", gap: "10px" }}>
+          <div style={{ display: "flex", gap: "8px" }}>
             <button 
               className={`btn-secondary ${activeTab === "terminal" ? "active" : ""}`}
               onClick={() => setActiveTab("terminal")}
@@ -457,71 +544,124 @@ export default function App() {
             >
               <TrendingUp size={14} /> Terminal
             </button>
+
+            <button 
+              className={`btn-secondary ${activeTab === "indicators" ? "active" : ""}`}
+              onClick={() => setActiveTab("indicators")}
+              style={{ display: "flex", alignItems: "center", gap: "6px" }}
+            >
+              <Activity size={14} /> All Indicators Hub
+            </button>
+
+            <button 
+              className={`btn-secondary ${activeTab === "copilot" ? "active" : ""}`}
+              onClick={() => setActiveTab("copilot")}
+              style={{ display: "flex", alignItems: "center", gap: "6px" }}
+            >
+              <Sparkles size={14} /> AI Copilot & Dossier
+            </button>
+
+            <button 
+              className={`btn-secondary ${activeTab === "news" ? "active" : ""}`}
+              onClick={() => setActiveTab("news")}
+              style={{ display: "flex", alignItems: "center", gap: "6px" }}
+            >
+              <Newspaper size={14} /> News & Sentiment
+            </button>
+
             <button 
               className={`btn-secondary ${activeTab === "holdings" ? "active" : ""}`}
               onClick={() => setActiveTab("holdings")}
               style={{ display: "flex", alignItems: "center", gap: "6px" }}
             >
-              <Layers size={14} /> Holdings Tracker ({trackedPositions.length})
+              <Layers size={14} /> Holdings ({trackedPositions.length})
             </button>
           </div>
         </header>
 
-        {activeTab === "terminal" ? (
-          <TerminalTab
-            isLoading={isLoading}
-            errorMsg={errorMsg}
-            analysisData={analysisData}
-            activeSymbol={activeSymbol}
-            timeframe={timeframe}
-            fetchAnalysis={fetchAnalysis}
-            cryptoPresets={cryptoPresets}
-            chainData={chainData}
-            backtestMetrics={backtestMetrics}
-            runningBacktest={runningBacktest}
-            runBacktest={runBacktest}
-            balance={balance}
-            setBalance={setBalance}
-            riskPercent={riskPercent}
-            setRiskPercent={setRiskPercent}
-            leverage={leverage}
-            setLeverage={setLeverage}
-            rrRatio={rrRatio}
-            setRrRatio={setRrRatio}
-            calcEntry={calcEntry}
-            setCalcEntry={setCalcEntry}
-            calcSL={calcSL}
-            setCalcSL={setCalcSL}
-            calcResult={calcResult}
-          />
-        ) : (
-          <HoldingsTab
-            trackedPositions={trackedPositions}
-            evaluationResults={evaluationResults}
-            evaluatingAll={evaluatingAll}
-            evaluateAllPositions={evaluateAllPositions}
-            handleRemovePosition={handleRemovePosition}
-            addPositionForm={
-              <AddPositionForm
-                formSymbol={formSymbol}
-                setFormSymbol={setFormSymbol}
-                formType={formType}
-                setFormType={setFormType}
-                formStrike={formStrike}
-                setFormStrike={setFormStrike}
-                formEntry={formEntry}
-                setFormEntry={setFormEntry}
-                formLimit={formLimit}
-                setFormLimit={setFormLimit}
-                formSl={formSl}
-                setFormSl={setFormSl}
-                formTf={formTf}
-                setFormTf={setFormTf}
-                onSubmit={handleAddPosition}
-              />
-            }
-          />
-        )}
+        {/* WORKSPACE TAB CONTENT ROUTER */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
+          {activeTab === "terminal" && (
+            <TerminalTab
+              isLoading={isLoading}
+              errorMsg={errorMsg}
+              analysisData={analysisData}
+              activeSymbol={activeSymbol}
+              timeframe={timeframe}
+              fetchAnalysis={fetchAnalysis}
+              cryptoPresets={cryptoPresets}
+              chainData={chainData}
+              backtestMetrics={backtestMetrics}
+              runningBacktest={runningBacktest}
+              runBacktest={runBacktest}
+              balance={balance}
+              setBalance={setBalance}
+              riskPercent={riskPercent}
+              setRiskPercent={setRiskPercent}
+              leverage={leverage}
+              setLeverage={setLeverage}
+              rrRatio={rrRatio}
+              setRrRatio={setRrRatio}
+              calcEntry={calcEntry}
+              setCalcEntry={setCalcEntry}
+              calcSL={calcSL}
+              setCalcSL={setCalcSL}
+              calcResult={calcResult}
+            />
+          )}
+
+          {activeTab === "indicators" && (
+            <AllIndicatorsHub
+              analysisData={analysisData}
+              activeSymbol={activeSymbol}
+            />
+          )}
+
+          {activeTab === "copilot" && (
+            <AICopilotTab
+              analysisData={analysisData}
+              activeSymbol={activeSymbol}
+            />
+          )}
+
+          {activeTab === "news" && (
+            <NewsSentimentTab
+              sentimentData={analysisData?.sentiment}
+              activeSymbol={activeSymbol}
+              onRefresh={() => fetchAnalysis(activeSymbol, timeframe)}
+              isLoading={isLoading}
+            />
+          )}
+
+          {activeTab === "holdings" && (
+            <HoldingsTab
+              trackedPositions={trackedPositions}
+              evaluationResults={evaluationResults}
+              evaluatingAll={evaluatingAll}
+              evaluateAllPositions={evaluateAllPositions}
+              handleRemovePosition={handleRemovePosition}
+              addPositionForm={
+                <AddPositionForm
+                  formSymbol={formSymbol}
+                  setFormSymbol={setFormSymbol}
+                  formType={formType}
+                  setFormType={setFormType}
+                  formStrike={formStrike}
+                  setFormStrike={setFormStrike}
+                  formEntry={formEntry}
+                  setFormEntry={setFormEntry}
+                  formLimit={formLimit}
+                  setFormLimit={setFormLimit}
+                  formSl={formSl}
+                  setFormSl={setFormSl}
+                  formTf={formTf}
+                  setFormTf={setFormTf}
+                  onSubmit={handleAddPosition}
+                />
+              }
+            />
+          )}
+        </div>
       </main>
     </div>
   );

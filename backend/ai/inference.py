@@ -39,6 +39,14 @@ def predict_latest(
             # Predict on the last row (current candle)
             last_row = X.iloc[[-1]].fillna(0)
             
+            # Align features with model if needed
+            if hasattr(model, "feature_names_in_"):
+                # If mismatch in feature columns, retrain or reindex
+                missing = [c for c in model.feature_names_in_ if c not in last_row.columns]
+                extra = [c for c in last_row.columns if c not in model.feature_names_in_]
+                if missing or extra:
+                    last_row = last_row.reindex(columns=model.feature_names_in_, fill_value=0)
+            
             # Predict probability
             prob = model.predict_proba(last_row)[0] # e.g. [prob_down, prob_up]
             up_prob = float(prob[1])
@@ -69,41 +77,38 @@ def predict_latest(
         from indicators.momentum import add_momentum_indicators
         
         d = df.copy()
-        d = add_trend_indicators(d)
-        d = add_momentum_indicators(d)
+        if "direction" not in d.columns:
+            d = add_trend_indicators(d)
+        if "rsi_14" not in d.columns:
+            d = add_momentum_indicators(d)
         
         last_row = d.iloc[-1]
         
-        rsi = last_row.get("rsi_14", 50)
-        direction = last_row.get("direction", 1)  # Supertrend direction (1 = Bullish, -1 = Bearish)
-        macd_hist = last_row.get("macd_hist", 0)
+        rsi_val = float(last_row.get("rsi_14", 50.0))
+        direction_val = int(last_row.get("direction", 1))
+        macd_hist_val = float(last_row.get("macd_hist", 0.0))
         
         score = 0
-        # Check Supertrend
-        if direction == 1:
+        if direction_val == 1:
             score += 1
         else:
             score -= 1
             
-        # Check RSI
-        if rsi > 50:
+        if rsi_val > 50:
             score += 1
-        elif rsi < 50:
+        elif rsi_val < 50:
             score -= 1
             
-        # Check MACD
-        if macd_hist > 0:
+        if macd_hist_val > 0:
             score += 1
-        elif macd_hist < 0:
+        elif macd_hist_val < 0:
             score -= 1
             
-        # Check news sentiment
         if sentiment_score >= 0.15:
             score += 1
         elif sentiment_score <= -0.15:
             score -= 1
 
-        # Determine signal based on consensus score (-4 to +4)
         if score >= 2:
             signal = "BUY"
             confidence = 0.5 + (score * 0.1)

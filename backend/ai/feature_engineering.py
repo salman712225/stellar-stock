@@ -76,6 +76,13 @@ def extract_features(
     features["return_2"] = d["close"].pct_change(2).fillna(0)
     features["return_5"] = d["close"].pct_change(5).fillna(0)
     
+    # Additional technical features
+    features["stoch_rsi_k"] = d["stoch_rsi_k"].fillna(50) if "stoch_rsi_k" in d else 50
+    features["williams_r"] = d["williams_r"].fillna(-50) if "williams_r" in d else -50
+    features["mfi_14"] = d["mfi_14"].fillna(50) if "mfi_14" in d else 50
+    features["close_to_vwap"] = ((d["close"] / d["vwap"].fillna(d["close"])) - 1.0) if "vwap" in d else 0.0
+    features["vol_spike"] = d["vol_spike"].astype(int) if "vol_spike" in d else 0
+    
     # Candlestick patterns (convert True/False to 1/0)
     features["pattern_doji"] = d["pattern_doji"].astype(int)
     features["pattern_hammer"] = d["pattern_hammer"].astype(int)
@@ -83,6 +90,10 @@ def extract_features(
     features["pattern_bullish_engulfing"] = d["pattern_bullish_engulfing"].astype(int)
     features["pattern_bearish_engulfing"] = d["pattern_bearish_engulfing"].astype(int)
     features["pattern_harami"] = d["pattern_harami"].astype(int)
+    features["pattern_morning_star"] = d["pattern_morning_star"].astype(int) if "pattern_morning_star" in d else 0
+    features["pattern_evening_star"] = d["pattern_evening_star"].astype(int) if "pattern_evening_star" in d else 0
+    features["pattern_three_white_soldiers"] = d["pattern_three_white_soldiers"].astype(int) if "pattern_three_white_soldiers" in d else 0
+    features["pattern_three_black_crows"] = d["pattern_three_black_crows"].astype(int) if "pattern_three_black_crows" in d else 0
     
     # Sentiment score (injected from news/social analyzer)
     features["sentiment_score"] = sentiment_score
@@ -103,9 +114,7 @@ def extract_features(
         features["opt_max_pain_dist"] = 0.0
 
     # 2. Define Target (1 if next close > current close, else 0)
-    # Target only generated if not running live prediction (i.e. we are training)
-    # We shift close backwards by 1 to get the next close
     y = (d["close"].shift(-1) > d["close"]).astype(int)
-    # Remove last row for training since it won't have a future target
     
     return features, y
+

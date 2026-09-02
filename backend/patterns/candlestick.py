@@ -99,13 +99,35 @@ def detect_candlestick_patterns(df: pd.DataFrame) -> pd.DataFrame:
         (close > midpoint_prev2)
     )
     
-    # 8. Evening Star: In shifted indexes: prev2 is bullish, prev1 is small body, current is bearish
-    midpoint_prev2_bullish = prev2_close - (prev2_close - prev2_open) / 2
-    d["pattern_evening_star"] = (
-        prev2_is_bullish &
-        (prev_body_size <= 0.20 * (high.shift(1) - low.shift(1))) &
-        is_bearish &
-        (close < midpoint_prev2_bullish)
+    # 9. Inverted Hammer: Upper wick >= 2x body, lower wick small, bullish or neutral
+    d["pattern_inverted_hammer"] = (
+        (upper_wick >= 2 * body_size) &
+        (lower_wick <= 0.10 * candle_range) &
+        (body_size > 0) &
+        is_bullish
     )
-    
+
+    # 10. Three White Soldiers: 3 consecutive bullish candles with progressive higher closes and opens within previous body
+    d["pattern_three_white_soldiers"] = (
+        is_bullish &
+        prev_is_bullish &
+        prev2_is_bullish &
+        (close > prev_close) &
+        (prev_close > prev2_close) &
+        (open_p > prev_open) &
+        (open_p < prev_close)
+    )
+
+    # 11. Three Black Crows: 3 consecutive bearish candles with progressive lower closes
+    d["pattern_three_black_crows"] = (
+        is_bearish &
+        prev_is_bearish &
+        prev2_is_bearish &
+        (close < prev_close) &
+        (prev_close < prev2_close) &
+        (open_p < prev_open) &
+        (open_p > prev_close)
+    )
+
     return d
+

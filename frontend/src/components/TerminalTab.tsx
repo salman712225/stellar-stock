@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { RefreshCw, Sparkles, Play, ChevronDown, ChevronUp } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { RefreshCw, Sparkles, Play, ChevronDown, ChevronUp, Target, TrendingUp } from "lucide-react";
 import { TradingViewChart } from "./TradingViewChart";
 import { ConsensusGauge } from "./ConsensusGauge";
 import { SizingPlanner } from "./SizingPlanner";
@@ -58,12 +58,29 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({
   calcResult,
 }) => {
   const [isReportExpanded, setIsReportExpanded] = useState(false);
+  const [mtfData, setMtfData] = useState<any>(null);
+
+  // Fetch Multi-timeframe confluence on symbol change
+  useEffect(() => {
+    const fetchMtf = async () => {
+      try {
+        const res = await fetch(`http://localhost:8000/api/multi-timeframe?symbol=${encodeURIComponent(activeSymbol)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setMtfData(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch MTF data:", err);
+      }
+    };
+    fetchMtf();
+  }, [activeSymbol]);
 
   if (isLoading) {
     return (
       <div style={{ textAlign: "center", padding: "100px 0", color: "#787b86" }}>
-        <RefreshCw className="spin" size={32} style={{ marginBottom: "10px" }} />
-        <div>Fetching market structures, sentiment arrays, and ML models...</div>
+        <RefreshCw className="spin" size={32} style={{ marginBottom: "10px", color: "#2962ff" }} />
+        <div style={{ fontSize: "14px", fontWeight: 600 }}>Calculating institutional SMC structures, momentum matrices, and AI forecasts for {activeSymbol}...</div>
       </div>
     );
   }
@@ -72,7 +89,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({
     return (
       <div
         style={{
-          padding: "40px",
+          padding: "30px",
           backgroundColor: "rgba(242, 54, 69, 0.1)",
           borderRadius: "6px",
           border: "1px solid #f23645",
@@ -94,17 +111,26 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({
   if (!analysisData) {
     return (
       <div style={{ textAlign: "center", padding: "100px 0", color: "#787b86" }}>
-        Select preset symbol on the left to pull live metrics.
+        Select preset symbol on the left to load real-time analytics.
       </div>
     );
   }
 
-  // Consensus Gauge calculation
   const latest = analysisData.indicators?.latest || {};
   const sig = analysisData.prediction?.signal || "HOLD";
   const rsi = latest.rsi_14 || 50;
   const score = analysisData.sentiment?.score || 0;
+  const currentPrice = analysisData.current_price || 0;
+  const atr = latest.atr_14 || (currentPrice * 0.02);
 
+  // Dynamic tactical calculations
+  const stopLoss = sig === "BUY" ? currentPrice - (2.0 * atr) : currentPrice + (2.0 * atr);
+  const tp1 = sig === "BUY" ? currentPrice + (1.5 * atr) : currentPrice - (1.5 * atr);
+  const tp2 = sig === "BUY" ? currentPrice + (3.0 * atr) : currentPrice - (3.0 * atr);
+  const tp3 = sig === "BUY" ? currentPrice + (5.0 * atr) : currentPrice - (5.0 * atr);
+  const rr = (Math.abs(tp2 - currentPrice) / Math.max(1e-5, Math.abs(currentPrice - stopLoss))).toFixed(2);
+
+  // Consensus Gauge calculation
   let rating = 50;
   if (latest.direction === 1) rating += 15; else rating -= 15;
   if (latest.range_direction === 1) rating += 15; else rating -= 15;
@@ -136,26 +162,67 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({
   return (
     <div className="workspace-content">
       <div className="split-layout">
-        {/* Left side: Interactive Candlestick charts & AI report */}
+        {/* LEFT COLUMN: Candlestick Chart & AI Report */}
         <div className="split-left">
           {/* Chart Panel */}
           <div className="tv-panel" style={{ padding: "8px" }}>
             <div
               className="tv-panel-header"
-              style={{ padding: "8px 12px 0 12px", borderBottom: "none" }}
+              style={{ padding: "6px 12px", borderBottom: "none" }}
             >
-              <span>📈 PRICE CHART & RANGE FILTER OVERLAYS</span>
-              <span style={{ color: "#787b86", fontSize: "10px" }}>Websocket Connected</span>
+              <span>📈 {activeSymbol} REAL-TIME CANDLESTICK CHART</span>
+              <span style={{ color: "#089981", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}>
+                <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#089981" }} /> Streaming Feed
+              </span>
             </div>
             {analysisData.chart_data && (
               <TradingViewChart candles={analysisData.chart_data} symbol={activeSymbol} />
             )}
           </div>
 
-          {/* AI report card - with toggle for user friendliness */}
+          {/* Multi-Timeframe Matrix Confluence Bar */}
+          {mtfData && mtfData.matrix && (
+            <div className="tv-panel">
+              <div className="tv-panel-header">
+                <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <TrendingUp size={14} style={{ color: "#2962ff" }} /> Multi-Timeframe Confluence Matrix
+                </span>
+                <span style={{ color: mtfData.overall_confluence?.includes("BULLISH") ? "#089981" : mtfData.overall_confluence?.includes("BEARISH") ? "#f23645" : "#FF9800", fontWeight: 700, fontSize: "11px" }}>
+                  {mtfData.overall_confluence} ({mtfData.bullish_percentage}% Bullish)
+                </span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px", padding: "6px 0" }}>
+                {["5m", "15m", "1h", "4h", "1d"].map((tf) => {
+                  const m = mtfData.matrix[tf] || {};
+                  const isBull = m.bias === "BULLISH";
+                  const isBear = m.bias === "BEARISH";
+                  return (
+                    <div
+                      key={tf}
+                      style={{
+                        backgroundColor: "#1e222d",
+                        padding: "8px",
+                        borderRadius: "4px",
+                        textAlign: "center",
+                        border: `1px solid ${isBull ? "rgba(8, 153, 129, 0.4)" : isBear ? "rgba(242, 54, 69, 0.4)" : "#2a2e39"}`
+                      }}
+                    >
+                      <div style={{ fontSize: "11px", color: "#787b86", fontWeight: 700 }}>{tf.toUpperCase()}</div>
+                      <div style={{ fontSize: "12px", fontWeight: "bold", margin: "4px 0", color: isBull ? "#089981" : isBear ? "#f23645" : "#787b86" }}>
+                        {m.bias || "NEUTRAL"}
+                      </div>
+                      <div style={{ fontSize: "10px", color: "#50535e" }}>RSI: {m.rsi || 50}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* AI Institutional Research Dossier Preview */}
           <div className="tv-panel">
             <div className="tv-panel-header" style={{ marginBottom: "6px" }}>
-              <span>🧠 AI ANALYST RESEARCH LOG REPORT</span>
+              <span>🧠 AI QUANT RESEARCH DOSSIER SUMMARY</span>
               <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                 <span style={{ color: "#2962ff", display: "flex", alignItems: "center", gap: "4px" }}>
                   <Sparkles size={11} /> Calibrated Forecast
@@ -177,7 +244,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({
                     </>
                   ) : (
                     <>
-                      <ChevronDown size={12} /> Expand
+                      <ChevronDown size={12} /> Expand Full Report
                     </>
                   )}
                 </button>
@@ -187,10 +254,11 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({
             <div
               className="report-markdown"
               style={{
-                maxHeight: isReportExpanded ? "none" : "120px",
+                maxHeight: isReportExpanded ? "none" : "140px",
                 overflowY: isReportExpanded ? "visible" : "hidden",
                 position: "relative",
                 transition: "max-height 0.2s ease-out",
+                fontSize: "12px"
               }}
             >
               <div
@@ -215,7 +283,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({
           </div>
         </div>
 
-        {/* Right side: Scorecards, Calculator, Backtester */}
+        {/* RIGHT COLUMN: Speedometer, Scorecards, Tactical Plan, Sizing, Backtester */}
         <div className="split-right">
           {/* Technical consensus */}
           <div className="tv-panel" style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -225,10 +293,10 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({
             <ConsensusGauge value={rating} label={conLabel} color={conColor} />
           </div>
 
-          {/* Core specs scorecards */}
+          {/* Core Scorecards */}
           <div className="tv-panel">
             <div className="tv-panel-header">
-              <span>📊 Asset Scorecards</span>
+              <span>📊 Asset Metric Scorecards</span>
             </div>
             <div className="tv-scorecard">
               <div className="tv-scorecard-label">Last Traded Price</div>
@@ -238,11 +306,11 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({
                   maximumFractionDigits: 4,
                 })}
               </div>
-              <div className="tv-scorecard-sub">Active Feed Price</div>
+              <div className="tv-scorecard-sub">Active CCXT / Yahoo Live Price</div>
             </div>
 
             <div className="tv-scorecard">
-              <div className="tv-scorecard-label">AI Forecast (ML Calibrated)</div>
+              <div className="tv-scorecard-label">AI Directional Forecast</div>
               <div style={{ marginTop: "4px" }}>
                 <span
                   className={
@@ -254,14 +322,14 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({
                   }
                 >
                   {analysisData.prediction?.signal || "HOLD"} (
-                  {((analysisData.prediction?.confidence || 0.5) * 100).toFixed(0)}% Conv)
+                  {((analysisData.prediction?.confidence || 0.5) * 100).toFixed(0)}% Confidence)
                 </span>
               </div>
-              <div className="tv-scorecard-sub">Next-period direction skew</div>
+              <div className="tv-scorecard-sub">Multi-feature machine learning classifier</div>
             </div>
 
             <div className="tv-scorecard">
-              <div className="tv-scorecard-label">Overall Sentiment</div>
+              <div className="tv-scorecard-label">Market & News Sentiment</div>
               <div style={{ marginTop: "4px" }}>
                 <span
                   className={
@@ -272,10 +340,42 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({
                       : "badge-hold"
                   }
                 >
-                  {analysisData.sentiment?.label?.toUpperCase() || "NEUTRAL"} ({analysisData.sentiment?.score})
+                  {analysisData.sentiment?.label?.toUpperCase() || "NEUTRAL"} ({analysisData.sentiment?.score > 0 ? `+${analysisData.sentiment?.score}` : analysisData.sentiment?.score})
                 </span>
               </div>
-              <div className="tv-scorecard-sub">News & forums aggregated sentiment</div>
+              <div className="tv-scorecard-sub">Fear & Greed Index: {analysisData.sentiment?.fear_greed?.score} ({analysisData.sentiment?.fear_greed?.label})</div>
+            </div>
+          </div>
+
+          {/* Tactical Execution Blueprint */}
+          <div className="tv-panel">
+            <div className="tv-panel-header">
+              <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <Target size={14} style={{ color: "#2962ff" }} /> Tactical Execution Setup
+              </span>
+              <span style={{ fontSize: "11px", color: "#FFCA28" }}>R:R = 1:{rr}</span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", padding: "4px 0" }}>
+              <div className="p-flex-between">
+                <span style={{ color: "#787b86" }}>Execution Entry:</span>
+                <strong>${currentPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })}</strong>
+              </div>
+              <div className="p-flex-between">
+                <span style={{ color: "#787b86" }}>Stop Loss (SL):</span>
+                <strong style={{ color: "#f23645" }}>${stopLoss.toLocaleString(undefined, { maximumFractionDigits: 4 })}</strong>
+              </div>
+              <div className="p-flex-between">
+                <span style={{ color: "#787b86" }}>Take Profit 1 (TP1):</span>
+                <strong style={{ color: "#089981" }}>${tp1.toLocaleString(undefined, { maximumFractionDigits: 4 })}</strong>
+              </div>
+              <div className="p-flex-between">
+                <span style={{ color: "#787b86" }}>Take Profit 2 (TP2):</span>
+                <strong style={{ color: "#00E676" }}>${tp2.toLocaleString(undefined, { maximumFractionDigits: 4 })}</strong>
+              </div>
+              <div className="p-flex-between">
+                <span style={{ color: "#787b86" }}>Take Profit 3 (TP3):</span>
+                <strong style={{ color: "#00B0FF" }}>${tp3.toLocaleString(undefined, { maximumFractionDigits: 4 })}</strong>
+              </div>
             </div>
           </div>
 
@@ -296,7 +396,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({
             calcResult={calcResult}
           />
 
-          {/* Options derivatives details */}
+          {/* Options derivatives details (if traditional asset) */}
           {!isCrypto && chainData && (
             <div className="tv-panel">
               <div className="tv-panel-header">
@@ -319,7 +419,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({
             </div>
           )}
 
-          {/* Backtest strategy simulator card */}
+          {/* Strategy Backtester card */}
           <div className="tv-panel">
             <div className="tv-panel-header">
               <span>🔄 Strategy Backtester Simulator</span>
