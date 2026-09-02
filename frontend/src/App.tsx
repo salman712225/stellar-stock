@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { TrendingUp, Layers, RefreshCw, Activity, Sparkles, Newspaper } from "lucide-react";
+import { TrendingUp, Layers, RefreshCw, Activity, Sparkles, Newspaper, Bot } from "lucide-react";
 import { TerminalTab } from "./components/TerminalTab";
 import { AllIndicatorsHub } from "./components/AllIndicatorsHub";
 import { AICopilotTab } from "./components/AICopilotTab";
 import { NewsSentimentTab } from "./components/NewsSentimentTab";
 import { HoldingsTab } from "./components/HoldingsTab";
 import { AddPositionForm } from "./components/AddPositionForm";
+import { DeltaAutoTraderTab } from "./components/DeltaAutoTraderTab";
 
 // Interfaces
 interface Position {
@@ -38,7 +39,7 @@ interface TickerItem {
 const API_URL = "http://localhost:8000";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"terminal" | "indicators" | "copilot" | "news" | "holdings">("terminal");
+  const [activeTab, setActiveTab] = useState<"terminal" | "indicators" | "copilot" | "news" | "holdings" | "delta">("terminal");
   const [assetClass, setAssetClass] = useState<"Crypto" | "FO">("Crypto");
   const [activeSymbol, setActiveSymbol] = useState("BTC/USDT");
   const [customSymbol, setCustomSymbol] = useState("");
@@ -570,6 +571,21 @@ export default function App() {
             </button>
 
             <button 
+              className={`btn-secondary ${activeTab === "delta" ? "active" : ""}`}
+              onClick={() => setActiveTab("delta")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                borderColor: activeTab === "delta" ? "#089981" : "#2a2e39",
+                color: activeTab === "delta" ? "#089981" : "#d1d4dc",
+                fontWeight: 600
+              }}
+            >
+              <Bot size={14} style={{ color: "#089981" }} /> Delta Auto-Trader ⚡
+            </button>
+
+            <button 
               className={`btn-secondary ${activeTab === "holdings" ? "active" : ""}`}
               onClick={() => setActiveTab("holdings")}
               style={{ display: "flex", alignItems: "center", gap: "6px" }}
@@ -630,6 +646,12 @@ export default function App() {
               activeSymbol={activeSymbol}
               onRefresh={() => fetchAnalysis(activeSymbol, timeframe)}
               isLoading={isLoading}
+            />
+          )}
+
+          {activeTab === "delta" && (
+            <DeltaAutoTraderTab
+              activeSymbol={activeSymbol}
             />
           )}
 
