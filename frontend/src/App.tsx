@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { TrendingUp, Layers, RefreshCw, Activity, Sparkles, Newspaper, Bot } from "lucide-react";
+import { TrendingUp, Layers, RefreshCw, Activity, Sparkles, Newspaper, Bot, Settings as SettingsIcon } from "lucide-react";
 import { TerminalTab } from "./components/TerminalTab";
 import { AllIndicatorsHub } from "./components/AllIndicatorsHub";
 import { AICopilotTab } from "./components/AICopilotTab";
@@ -7,6 +7,7 @@ import { NewsSentimentTab } from "./components/NewsSentimentTab";
 import { HoldingsTab } from "./components/HoldingsTab";
 import { AddPositionForm } from "./components/AddPositionForm";
 import { DeltaAutoTraderTab } from "./components/DeltaAutoTraderTab";
+import { SettingsTab } from "./components/SettingsTab";
 
 // Interfaces
 interface Position {
@@ -39,7 +40,7 @@ interface TickerItem {
 const API_URL = "http://localhost:8000";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"terminal" | "indicators" | "copilot" | "news" | "holdings" | "delta">("terminal");
+  const [activeTab, setActiveTab] = useState<"terminal" | "indicators" | "copilot" | "news" | "delta" | "holdings" | "settings">("terminal");
   const [assetClass, setAssetClass] = useState<"Crypto" | "FO">("Crypto");
   const [activeSymbol, setActiveSymbol] = useState("BTC/USDT");
   const [customSymbol, setCustomSymbol] = useState("");
@@ -592,6 +593,21 @@ export default function App() {
             >
               <Layers size={14} /> Holdings ({trackedPositions.length})
             </button>
+
+            <button 
+              className={`btn-secondary ${activeTab === "settings" ? "active" : ""}`}
+              onClick={() => setActiveTab("settings")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                borderColor: activeTab === "settings" ? "#2962ff" : "#2a2e39",
+                color: activeTab === "settings" ? "#2962ff" : "#d1d4dc",
+                fontWeight: 600
+              }}
+            >
+              <SettingsIcon size={14} /> Settings ⚙️
+            </button>
           </div>
         </header>
 
@@ -682,6 +698,10 @@ export default function App() {
                 />
               }
             />
+          )}
+
+          {activeTab === "settings" && (
+            <SettingsTab />
           )}
         </div>
       </main>

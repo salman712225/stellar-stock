@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
-from execution.delta_client import delta_client
+from execution.delta_client import delta_client, save_persistent_settings, load_persistent_settings
 from data.market_data import market_data_provider
 from indicators.trend import calculate_range_filter
 
@@ -18,14 +18,15 @@ class DeltaAutoTrader:
     """
 
     def __init__(self):
-        self.enabled = False
-        self.environment = "testnet" # "testnet" | "global" | "india"
-        self.asset = "BTC/USDT"
-        self.timeframe = "1h"
-        self.instrument_type = "options" # "options" | "futures"
-        self.size_contracts = 1
-        self.strike_offset = 0 # 0 = ATM, 1 = OTM+1, -1 = ITM-1
-        self.stop_loss_pct = 50.0 # Option stop loss %
+        saved = load_persistent_settings()
+        self.enabled = bool(saved.get("enabled", False))
+        self.environment = saved.get("environment", "testnet")
+        self.asset = saved.get("asset", "BTC/USDT")
+        self.timeframe = saved.get("timeframe", "1h")
+        self.instrument_type = saved.get("instrument_type", "options")
+        self.size_contracts = int(saved.get("size_contracts", 1))
+        self.strike_offset = int(saved.get("strike_offset", 0))
+        self.stop_loss_pct = float(saved.get("stop_loss_pct", 50.0))
         
         # Internal State Machine
         # state: "IDLE" | "IN_CALL" | "IN_PUT" | "IN_LONG_PERP" | "IN_SHORT_PERP"
@@ -53,33 +54,44 @@ class DeltaAutoTrader:
 
     def update_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Updates bot parameters and API credentials.
+        Updates bot parameters and API credentials persistently.
         """
+        persist_data = {}
         if "api_key" in config and "api_secret" in config:
             env = config.get("environment", self.environment)
-            delta_client.set_credentials(config["api_key"], config["api_secret"], env)
+            delta_client.set_credentials(config["api_key"], config["api_secret"], env, persist=True)
             self.environment = env
             self.add_log("info", f"Delta Exchange credentials updated for {env.upper()} environment.")
 
         if "asset" in config:
             self.asset = config["asset"]
+            persist_data["asset"] = self.asset
         if "timeframe" in config:
             self.timeframe = config["timeframe"]
+            persist_data["timeframe"] = self.timeframe
         if "instrument_type" in config:
             self.instrument_type = config["instrument_type"]
+            persist_data["instrument_type"] = self.instrument_type
         if "size_contracts" in config:
             self.size_contracts = max(1, int(config["size_contracts"]))
+            persist_data["size_contracts"] = self.size_contracts
         if "strike_offset" in config:
             self.strike_offset = int(config["strike_offset"])
+            persist_data["strike_offset"] = self.strike_offset
         if "stop_loss_pct" in config:
             self.stop_loss_pct = float(config["stop_loss_pct"])
+            persist_data["stop_loss_pct"] = self.stop_loss_pct
         if "enabled" in config:
             old_val = self.enabled
             self.enabled = bool(config["enabled"])
+            persist_data["enabled"] = self.enabled
             if self.enabled and not old_val:
                 self.add_log("success", f"⚡ Auto-Trader ACTIVATED on {self.asset} ({self.timeframe}) using {self.instrument_type.upper()}.")
             elif not self.enabled and old_val:
                 self.add_log("warning", "⏸️ Auto-Trader PAUSED by user.")
+
+        if persist_data:
+            save_persistent_settings(persist_data)
 
         return self.get_status()
 

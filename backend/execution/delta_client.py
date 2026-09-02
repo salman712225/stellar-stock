@@ -4,16 +4,43 @@ import hashlib
 import json
 import logging
 import httpx
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
+from config import DATA_CACHE_DIR
 
 logger = logging.getLogger("delta_client")
+
+SETTINGS_FILE = DATA_CACHE_DIR / "delta_settings.json"
+
+def save_persistent_settings(data: Dict[str, Any]) -> bool:
+    try:
+        current = {}
+        if SETTINGS_FILE.exists():
+            with open(SETTINGS_FILE, "r") as f:
+                current = json.load(f)
+        current.update(data)
+        with open(SETTINGS_FILE, "w") as f:
+            json.dump(current, f, indent=2)
+        return True
+    except Exception as e:
+        logger.error(f"Error saving delta settings: {e}")
+        return False
+
+def load_persistent_settings() -> Dict[str, Any]:
+    try:
+        if SETTINGS_FILE.exists():
+            with open(SETTINGS_FILE, "r") as f:
+                return json.load(f)
+    except Exception as e:
+        logger.error(f"Error loading delta settings: {e}")
+    return {}
 
 class DeltaExchangeClient:
     """
     High-performance Delta Exchange API Client.
     Supports Delta Global, Delta India, and Testnet Sandbox.
-    Handles HMAC-SHA256 authentication, ATM option selection, and order placement.
+    Handles HMAC-SHA256 authentication, ATM option selection, order placement, and persistent settings.
     """
 
     ENDPOINTS = {
@@ -26,18 +53,26 @@ class DeltaExchangeClient:
         self,
         api_key: Optional[str] = None,
         api_secret: Optional[str] = None,
-        environment: str = "testnet"
+        environment: Optional[str] = None
     ):
-        self.api_key = api_key or ""
-        self.api_secret = api_secret or ""
-        self.environment = environment if environment in self.ENDPOINTS else "testnet"
+        saved = load_persistent_settings()
+        self.api_key = api_key if api_key is not None else saved.get("api_key", "")
+        self.api_secret = api_secret if api_secret is not None else saved.get("api_secret", "")
+        env = environment or saved.get("environment", "testnet")
+        self.environment = env if env in self.ENDPOINTS else "testnet"
         self.base_url = self.ENDPOINTS[self.environment]
 
-    def set_credentials(self, api_key: str, api_secret: str, environment: str = "testnet"):
+    def set_credentials(self, api_key: str, api_secret: str, environment: str = "testnet", persist: bool = True):
         self.api_key = api_key.strip()
         self.api_secret = api_secret.strip()
         self.environment = environment if environment in self.ENDPOINTS else "testnet"
         self.base_url = self.ENDPOINTS[self.environment]
+        if persist:
+            save_persistent_settings({
+                "api_key": self.api_key,
+                "api_secret": self.api_secret,
+                "environment": self.environment
+            })
 
     def _generate_signature(self, method: str, path: str, query_string: str = "", payload_str: str = "") -> tuple[str, str]:
         """

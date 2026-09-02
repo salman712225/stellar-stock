@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 
-from execution.delta_client import delta_client
+from execution.delta_client import delta_client, save_persistent_settings, load_persistent_settings
 from execution.auto_trader import auto_trader
 
 router = APIRouter(prefix="/api/delta", tags=["delta-exchange"])
@@ -35,17 +35,59 @@ async def get_delta_status():
         "bot": bot_status
     }
 
+@router.get("/settings")
+async def get_delta_settings():
+    """
+    Returns saved settings with masked API secret for security.
+    """
+    saved = load_persistent_settings()
+    masked_secret = ""
+    if saved.get("api_secret"):
+        sec = saved["api_secret"]
+        masked_secret = ("•" * 12) + sec[-4:] if len(sec) > 4 else "••••••••"
+        
+    return {
+        "api_key": saved.get("api_key", ""),
+        "api_secret_masked": masked_secret,
+        "has_secret": bool(saved.get("api_secret")),
+        "environment": saved.get("environment", "testnet"),
+        "asset": saved.get("asset", "BTC/USDT"),
+        "timeframe": saved.get("timeframe", "1h"),
+        "instrument_type": saved.get("instrument_type", "options"),
+        "size_contracts": saved.get("size_contracts", 1),
+        "strike_offset": saved.get("strike_offset", 0),
+        "stop_loss_pct": saved.get("stop_loss_pct", 50.0),
+        "enabled": saved.get("enabled", False)
+    }
+
+@router.post("/save-settings")
 @router.post("/config")
 async def update_delta_config(payload: DeltaConfigPayload):
     """
-    Updates Auto-Trader configuration, credentials, and enabled state.
+    Updates and permanently saves Delta Exchange API credentials and bot settings.
     """
     cfg = payload.dict(exclude_unset=True)
     status = auto_trader.update_config(cfg)
+    conn_info = await delta_client.check_connection()
+    
     return {
         "success": True,
         "status": status,
-        "message": "Configuration updated successfully."
+        "connection": conn_info,
+        "message": "Settings saved and applied successfully."
+    }
+
+@router.post("/test-connection")
+async def test_delta_connection():
+    """
+    Tests credentials against Delta Exchange API and returns connection status.
+    """
+    conn_info = await delta_client.check_connection()
+    balances = await delta_client.get_wallet_balances()
+    
+    return {
+        "connection": conn_info,
+        "balances": balances
     }
 
 @router.get("/positions")
@@ -93,3 +135,4 @@ async def get_trade_logs():
     return {
         "logs": auto_trader.logs
     }
+
