@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
 from execution.delta_client import delta_client, save_persistent_settings, load_persistent_settings
+from execution.snapserve_client import snapserve_voice_client
 from data.market_data import market_data_provider
 from indicators.trend import calculate_range_filter
 
@@ -294,6 +295,40 @@ class DeltaAutoTrader:
                             "opened_at": datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
                         }
                         self.add_log("success", f"🎉 Entered Perpetual SHORT on {perp_sym}!")
+
+        # =====================================================================
+        # 3. TRIGGER AUTOMATED SNAPSERVE VOICE CALLS TO SUBSCRIBERS
+        # =====================================================================
+        try:
+            atr = current_price * 0.02
+            sl = round(current_price - (2.0 * atr) if signal == "BUY" else current_price + (2.0 * atr), 2)
+            tp1 = round(current_price + (1.5 * atr) if signal == "BUY" else current_price - (1.5 * atr), 2)
+            tp2 = round(current_price + (3.0 * atr) if signal == "BUY" else current_price - (3.0 * atr), 2)
+            tp3 = round(current_price + (5.0 * atr) if signal == "BUY" else current_price - (5.0 * atr), 2)
+
+            voice_payload = {
+                "asset": self.asset,
+                "signal": signal,
+                "timeframe": self.timeframe,
+                "spot_price": current_price,
+                "stop_loss": sl,
+                "tp1": tp1,
+                "tp2": tp2,
+                "tp3": tp3,
+                "sentiment_label": "Bullish" if signal == "BUY" else "Bearish",
+                "sentiment_score": 0.65 if signal == "BUY" else -0.65,
+                "fear_greed": "Greed" if signal == "BUY" else "Fear",
+                "smc_summary": f"Range Filter confirmed {signal} with liquidity expansion",
+                "ai_prediction": f"{signal} (Institutional Quantitative Signal)",
+                "top_news": f"Market momentum accelerating in {self.asset}",
+                "timestamp": signal_timestamp
+            }
+
+            # Spawn background voice broadcast
+            asyncio.create_task(snapserve_voice_client.broadcast_signal_to_subscribers(voice_payload))
+            self.add_log("info", f"📞 Dispatched SnapServe AI voice signal calls for {self.asset} ({signal}).")
+        except Exception as ve:
+            logger.warning(f"Voice alert dispatch error: {ve}")
 
     async def panic_close_all(self) -> Dict[str, Any]:
         """

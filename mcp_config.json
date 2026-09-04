@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "snapserve": {
+      "command": "npx",
+      "args": ["-y", "@snapserveai/mcp"],
+      "env": {
+        "SNAPSERVE_API_KEY": "${SNAPSERVE_API_KEY}",
+        "SNAPSERVE_BASE_URL": "https://app.snapserve.ai/api"
+      }
+    }
+  }
+}

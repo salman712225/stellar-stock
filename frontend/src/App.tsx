@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { TrendingUp, Layers, RefreshCw, Activity, Sparkles, Newspaper, Bot, Settings as SettingsIcon } from "lucide-react";
+import { TrendingUp, Layers, RefreshCw, Activity, Sparkles, Newspaper, Bot, Settings as SettingsIcon, PhoneCall } from "lucide-react";
 import { TerminalTab } from "./components/TerminalTab";
 import { AllIndicatorsHub } from "./components/AllIndicatorsHub";
 import { AICopilotTab } from "./components/AICopilotTab";
@@ -8,6 +8,7 @@ import { HoldingsTab } from "./components/HoldingsTab";
 import { AddPositionForm } from "./components/AddPositionForm";
 import { DeltaAutoTraderTab } from "./components/DeltaAutoTraderTab";
 import { SettingsTab } from "./components/SettingsTab";
+import { VoiceAlertsTab } from "./components/VoiceAlertsTab";
 
 // Interfaces
 interface Position {
@@ -40,7 +41,7 @@ interface TickerItem {
 import { API_URL } from "./config";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"terminal" | "indicators" | "copilot" | "news" | "delta" | "holdings" | "settings">("terminal");
+  const [activeTab, setActiveTab] = useState<"terminal" | "indicators" | "copilot" | "news" | "delta" | "voice" | "holdings" | "settings">("terminal");
   const [assetClass, setAssetClass] = useState<"Crypto" | "FO">("Crypto");
   const [activeSymbol, setActiveSymbol] = useState("BTC/USDT");
   const [customSymbol, setCustomSymbol] = useState("");
@@ -587,6 +588,21 @@ export default function App() {
             </button>
 
             <button 
+              className={`btn-secondary ${activeTab === "voice" ? "active" : ""}`}
+              onClick={() => setActiveTab("voice")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                borderColor: activeTab === "voice" ? "#38bdf8" : "#2a2e39",
+                color: activeTab === "voice" ? "#38bdf8" : "#d1d4dc",
+                fontWeight: 600
+              }}
+            >
+              <PhoneCall size={14} style={{ color: "#38bdf8" }} /> Voice Alerts 📞
+            </button>
+
+            <button 
               className={`btn-secondary ${activeTab === "holdings" ? "active" : ""}`}
               onClick={() => setActiveTab("holdings")}
               style={{ display: "flex", alignItems: "center", gap: "6px" }}
@@ -698,6 +714,10 @@ export default function App() {
                 />
               }
             />
+          )}
+
+          {activeTab === "voice" && (
+            <VoiceAlertsTab activeSymbol={activeSymbol} />
           )}
 
           {activeTab === "settings" && (

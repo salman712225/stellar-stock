@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routes import router as api_router
 from api.websocket import router as ws_router
 from api.delta_routes import router as delta_router
+from api.voice_routes import router as voice_router
 from database.mongodb import db
 from data.websocket import live_feed
 from execution.auto_trader import auto_trader
@@ -61,6 +62,7 @@ async def shutdown_db_client():
 app.include_router(api_router)
 app.include_router(ws_router)
 app.include_router(delta_router)
+app.include_router(voice_router)
 
 if __name__ == "__main__":
     logger.info("Initializing Uvicorn ASGI Server...")
