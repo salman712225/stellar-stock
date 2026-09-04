@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Sparkles, Send, Bot, User, Copy, Check, Award } from "lucide-react";
+import { Sparkles, Send, Bot, User, Copy, Check, Award, RotateCcw } from "lucide-react";
 import { API_URL } from "../config";
 
 interface AICopilotTabProps {
@@ -15,17 +15,40 @@ interface ChatMessage {
 }
 
 export const AICopilotTab: React.FC<AICopilotTabProps> = ({ analysisData, activeSymbol }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "1",
-      sender: "ai",
-      text: `Hello! I am your institutional **AI Strategy Copilot**. I have parsed the real-time order books, technical indicators, SMC structures, and news sentiment for **${activeSymbol}**. What would you like to analyze?`,
-      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    }
-  ]);
+  const defaultInitialMessage: ChatMessage = {
+    id: "1",
+    sender: "ai",
+    text: `Hello! I am your institutional **AI Strategy Copilot**. I have parsed the real-time order books, technical indicators, SMC structures, and news sentiment for **${activeSymbol}**. What would you like to analyze?`,
+    time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  };
+
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem("stellar_copilot_messages");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return [defaultInitialMessage];
+  });
   const [inputVal, setInputVal] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Sync messages to localStorage
+  React.useEffect(() => {
+    try {
+      localStorage.setItem("stellar_copilot_messages", JSON.stringify(messages));
+    } catch (e) {}
+  }, [messages]);
+
+  const handleClearChat = () => {
+    setMessages([defaultInitialMessage]);
+    try {
+      localStorage.removeItem("stellar_copilot_messages");
+    } catch (e) {}
+  };
 
   const quickPrompts = [
     `What is the ideal entry setup for ${activeSymbol}?`,
@@ -143,13 +166,23 @@ export const AICopilotTab: React.FC<AICopilotTabProps> = ({ analysisData, active
 
       {/* RIGHT COLUMN: Interactive Strategy Copilot */}
       <div className="tv-panel" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-        <div className="tv-panel-header" style={{ flexShrink: 0 }}>
+        <div className="tv-panel-header" style={{ flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <Bot size={15} style={{ color: "#00E676" }} /> AI Strategy Copilot
           </span>
-          <span style={{ fontSize: "10px", color: "#089981", display: "flex", alignItems: "center", gap: "4px" }}>
-            <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#089981" }} /> Online
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <button
+              className="btn-secondary"
+              onClick={handleClearChat}
+              title="Reset conversation"
+              style={{ fontSize: "10px", padding: "2px 6px", display: "flex", alignItems: "center", gap: "4px" }}
+            >
+              <RotateCcw size={10} /> Clear
+            </button>
+            <span style={{ fontSize: "10px", color: "#089981", display: "flex", alignItems: "center", gap: "4px" }}>
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#089981" }} /> Online
+            </span>
+          </div>
         </div>
 
         {/* Chat Message Stream */}

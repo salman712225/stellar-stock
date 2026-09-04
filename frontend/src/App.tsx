@@ -41,54 +41,85 @@ interface TickerItem {
 import { API_URL } from "./config";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"terminal" | "indicators" | "copilot" | "news" | "delta" | "voice" | "holdings" | "settings">("terminal");
-  const [assetClass, setAssetClass] = useState<"Crypto" | "FO">("Crypto");
-  const [activeSymbol, setActiveSymbol] = useState("BTC/USDT");
+  const [activeTab, setActiveTab] = useState<"terminal" | "indicators" | "copilot" | "news" | "delta" | "voice" | "holdings" | "settings">(() => {
+    return (localStorage.getItem("stellar_active_tab") as any) || "terminal";
+  });
+  const [assetClass, setAssetClass] = useState<"Crypto" | "FO">(() => {
+    return (localStorage.getItem("stellar_asset_class") as any) || "Crypto";
+  });
+  const [activeSymbol, setActiveSymbol] = useState(() => {
+    return localStorage.getItem("stellar_active_symbol") || "BTC/USDT";
+  });
   const [customSymbol, setCustomSymbol] = useState("");
-  const [timeframe, setTimeframe] = useState("1h");
+  const [timeframe, setTimeframe] = useState(() => {
+    return localStorage.getItem("stellar_timeframe") || "1h";
+  });
 
   // Top Marquee Ticker
   const [tickerItems, setTickerItems] = useState<TickerItem[]>([]);
 
   // Default Sizing parameters
-  const [balance, setBalance] = useState(10000);
-  const [riskPercent, setRiskPercent] = useState(1.0);
-  const [leverage, setLeverage] = useState(1.0);
-  const [rrRatio, setRrRatio] = useState(2.0);
+  const [balance, setBalance] = useState(() => {
+    const saved = localStorage.getItem("stellar_balance");
+    return saved ? Number(saved) : 10000;
+  });
+  const [riskPercent, setRiskPercent] = useState(() => {
+    const saved = localStorage.getItem("stellar_risk_percent");
+    return saved ? Number(saved) : 1.0;
+  });
+  const [leverage, setLeverage] = useState(() => {
+    const saved = localStorage.getItem("stellar_leverage");
+    return saved ? Number(saved) : 1.0;
+  });
+  const [rrRatio, setRrRatio] = useState(() => {
+    const saved = localStorage.getItem("stellar_rr_ratio");
+    return saved ? Number(saved) : 2.0;
+  });
 
-  // Live Position Evaluator variables
-  const [trackedPositions, setTrackedPositions] = useState<Position[]>([
-    {
-      id: 1,
-      symbol: "BTC/USDT",
-      type: "long",
-      strike: null,
-      entry: 64200,
-      limit: 67500,
-      sl: 62800,
-      timeframe: "1h"
-    },
-    {
-      id: 2,
-      symbol: "ETH/USDT",
-      type: "long",
-      strike: null,
-      entry: 2650,
-      limit: 2850,
-      sl: 2540,
-      timeframe: "1h"
-    },
-    {
-      id: 3,
-      symbol: "XAUT/USDT",
-      type: "long",
-      strike: null,
-      entry: 2510,
-      limit: 2600,
-      sl: 2470,
-      timeframe: "1h"
+  // Live Position Evaluator variables with localStorage persistence
+  const [trackedPositions, setTrackedPositions] = useState<Position[]>(() => {
+    try {
+      const saved = localStorage.getItem("stellar_tracked_positions");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error("Error loading saved positions:", e);
     }
-  ]);
+    return [
+      {
+        id: 1,
+        symbol: "BTC/USDT",
+        type: "long",
+        strike: null,
+        entry: 64200,
+        limit: 67500,
+        sl: 62800,
+        timeframe: "1h"
+      },
+      {
+        id: 2,
+        symbol: "ETH/USDT",
+        type: "long",
+        strike: null,
+        entry: 2650,
+        limit: 2850,
+        sl: 2540,
+        timeframe: "1h"
+      },
+      {
+        id: 3,
+        symbol: "XAUT/USDT",
+        type: "long",
+        strike: null,
+        entry: 2510,
+        limit: 2600,
+        sl: 2470,
+        timeframe: "1h"
+      }
+    ];
+  });
 
   // Dynamic dashboard states
   const [analysisData, setAnalysisData] = useState<any>(null);
@@ -99,8 +130,17 @@ export default function App() {
   const [evaluationResults, setEvaluationResults] = useState<Record<number, any>>({});
   const [evaluatingAll, setEvaluatingAll] = useState(false);
 
-  // Alerts Feed
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+  // Alerts Feed with localStorage persistence
+  const [alerts, setAlerts] = useState<Alert[]>(() => {
+    try {
+      const saved = localStorage.getItem("stellar_alerts");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
   const [isScanning, setIsScanning] = useState(false);
 
   // Forms to add active positions
@@ -320,6 +360,52 @@ export default function App() {
       evaluateAllPositions();
     }
   }, [trackedPositions]);
+
+  // Persist preferences & holdings to localStorage across browser reloads
+  useEffect(() => {
+    try {
+      localStorage.setItem("stellar_active_tab", activeTab);
+    } catch (e) {}
+  }, [activeTab]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("stellar_asset_class", assetClass);
+    } catch (e) {}
+  }, [assetClass]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("stellar_active_symbol", activeSymbol);
+    } catch (e) {}
+  }, [activeSymbol]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("stellar_timeframe", timeframe);
+    } catch (e) {}
+  }, [timeframe]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("stellar_balance", String(balance));
+      localStorage.setItem("stellar_risk_percent", String(riskPercent));
+      localStorage.setItem("stellar_leverage", String(leverage));
+      localStorage.setItem("stellar_rr_ratio", String(rrRatio));
+    } catch (e) {}
+  }, [balance, riskPercent, leverage, rrRatio]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("stellar_tracked_positions", JSON.stringify(trackedPositions));
+    } catch (e) {}
+  }, [trackedPositions]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("stellar_alerts", JSON.stringify(alerts.slice(0, 30)));
+    } catch (e) {}
+  }, [alerts]);
 
   const handlePresetSelect = (sym: string) => {
     setActiveSymbol(sym);

@@ -1,22 +1,43 @@
 import React, { useState, useEffect } from "react";
-import { Settings as SettingsIcon, Key, ShieldCheck, CheckCircle2, XCircle, RefreshCw, Eye, EyeOff, Save } from "lucide-react";
-import { API_URL } from "../config";
+import { Settings as SettingsIcon, Key, ShieldCheck, CheckCircle2, XCircle, RefreshCw, Eye, EyeOff, Save, Globe, RotateCcw } from "lucide-react";
+import { API_URL, getApiUrl, setCustomApiUrl } from "../config";
 
 export const SettingsTab: React.FC = () => {
-  // Delta Credentials & Settings
-  const [apiKey, setApiKey] = useState("");
+  // Backend Server Connection Settings
+  const [backendUrl, setBackendUrl] = useState(() => {
+    return localStorage.getItem("stellar_backend_url") || (import.meta.env.VITE_API_URL || "");
+  });
+  const [serverHealth, setServerHealth] = useState<any>(null);
+  const [isCheckingServer, setIsCheckingServer] = useState(false);
+  const [serverMsg, setServerMsg] = useState("");
+
+  // Delta Credentials & Settings with localStorage caching
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem("stellar_delta_api_key") || "");
   const [apiSecret, setApiSecret] = useState("");
   const [showSecret, setShowSecret] = useState(false);
   const [savedSecretMasked, setSavedSecretMasked] = useState("");
-  const [environment, setEnvironment] = useState<"testnet" | "global" | "india">("testnet");
+  const [environment, setEnvironment] = useState<"testnet" | "global" | "india">(() => {
+    return (localStorage.getItem("stellar_delta_environment") as any) || "testnet";
+  });
 
-  // Strategy & Risk Defaults
-  const [defaultAsset, setDefaultAsset] = useState("BTC/USDT");
-  const [defaultTimeframe, setDefaultTimeframe] = useState("1h");
-  const [defaultInstrument, setDefaultInstrument] = useState<"options" | "futures">("options");
-  const [defaultSize, setDefaultSize] = useState(1);
-  const [defaultStrikeOffset, setDefaultStrikeOffset] = useState(0);
-  const [defaultStopLoss, setDefaultStopLoss] = useState(50);
+  // Strategy & Risk Defaults with localStorage caching
+  const [defaultAsset, setDefaultAsset] = useState(() => localStorage.getItem("stellar_default_asset") || "BTC/USDT");
+  const [defaultTimeframe, setDefaultTimeframe] = useState(() => localStorage.getItem("stellar_default_tf") || "1h");
+  const [defaultInstrument, setDefaultInstrument] = useState<"options" | "futures">(() => {
+    return (localStorage.getItem("stellar_default_instrument") as any) || "options";
+  });
+  const [defaultSize, setDefaultSize] = useState(() => {
+    const s = localStorage.getItem("stellar_default_size");
+    return s ? parseInt(s) : 1;
+  });
+  const [defaultStrikeOffset, setDefaultStrikeOffset] = useState(() => {
+    const s = localStorage.getItem("stellar_default_strike_offset");
+    return s !== null ? parseInt(s) : 0;
+  });
+  const [defaultStopLoss, setDefaultStopLoss] = useState(() => {
+    const s = localStorage.getItem("stellar_default_sl");
+    return s ? parseFloat(s) : 50;
+  });
 
   // Status & Feedback
   const [isSaving, setIsSaving] = useState(false);
@@ -49,11 +70,23 @@ export const SettingsTab: React.FC = () => {
     fetchSettings();
   }, []);
 
-  // Save Settings permanently
+  // Save Settings permanently (both to backend and localStorage)
   const handleSaveSettings = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setIsSaving(true);
     setSaveSuccessMsg("");
+
+    // Cache locally immediately
+    try {
+      if (apiKey.trim()) localStorage.setItem("stellar_delta_api_key", apiKey.trim());
+      localStorage.setItem("stellar_delta_environment", environment);
+      localStorage.setItem("stellar_default_asset", defaultAsset);
+      localStorage.setItem("stellar_default_tf", defaultTimeframe);
+      localStorage.setItem("stellar_default_instrument", defaultInstrument);
+      localStorage.setItem("stellar_default_size", String(defaultSize));
+      localStorage.setItem("stellar_default_strike_offset", String(defaultStrikeOffset));
+      localStorage.setItem("stellar_default_sl", String(defaultStopLoss));
+    } catch (e) {}
 
     try {
       const payload: any = {
@@ -69,7 +102,8 @@ export const SettingsTab: React.FC = () => {
       if (apiKey.trim()) payload.api_key = apiKey.trim();
       if (apiSecret.trim()) payload.api_secret = apiSecret.trim();
 
-      const res = await fetch(`${API_URL}/api/delta/save-settings`, {
+      const activeUrl = getApiUrl();
+      const res = await fetch(`${activeUrl}/api/delta/save-settings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -87,10 +121,11 @@ export const SettingsTab: React.FC = () => {
         }
         setTimeout(() => setSaveSuccessMsg(""), 5000);
       } else {
-        throw new Error("Failed to save settings");
+        throw new Error("Failed to save settings to server");
       }
     } catch (err: any) {
-      alert(`Error saving settings: ${err.message}`);
+      setSaveSuccessMsg("⚠️ Saved to local browser storage (Backend server may be unreachable).");
+      setTimeout(() => setSaveSuccessMsg(""), 5000);
     } finally {
       setIsSaving(false);
     }
@@ -101,7 +136,8 @@ export const SettingsTab: React.FC = () => {
     setIsTesting(true);
     setConnResult(null);
     try {
-      const res = await fetch(`${API_URL}/api/delta/test-connection`, {
+      const activeUrl = getApiUrl();
+      const res = await fetch(`${activeUrl}/api/delta/test-connection`, {
         method: "POST"
       });
       if (res.ok) {
@@ -115,6 +151,46 @@ export const SettingsTab: React.FC = () => {
     }
   };
 
+  // Backend URL Handlers
+  const handleSaveBackendUrl = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setCustomApiUrl(backendUrl);
+    setServerMsg("✅ Backend Server URL updated and saved! Reloading live endpoints...");
+    setTimeout(() => {
+      setServerMsg("");
+      window.location.reload();
+    }, 1200);
+  };
+
+  const handleTestBackendServer = async () => {
+    setIsCheckingServer(true);
+    setServerHealth(null);
+    setServerMsg("");
+    try {
+      const urlToTest = (backendUrl || getApiUrl()).replace(/\/$/, "");
+      const res = await fetch(`${urlToTest}/api/server-ip`, { signal: AbortSignal.timeout(6000) });
+      if (res.ok) {
+        const data = await res.json();
+        setServerHealth({ ok: true, ip: data.ip || "Connected", url: urlToTest });
+      } else {
+        setServerHealth({ ok: false, error: `HTTP ${res.status}: ${res.statusText}`, url: urlToTest });
+      }
+    } catch (err: any) {
+      setServerHealth({ ok: false, error: err.message || "Failed to reach backend server", url: backendUrl });
+    } finally {
+      setIsCheckingServer(false);
+    }
+  };
+
+  const handleResetBackendUrl = () => {
+    setCustomApiUrl("");
+    setBackendUrl(import.meta.env.VITE_API_URL || "");
+    setServerMsg("🔄 Reset to default build URL. Reloading...");
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+  };
+
   return (
     <div style={{ maxWidth: "1000px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "20px" }}>
       {/* Header Bar */}
@@ -122,9 +198,9 @@ export const SettingsTab: React.FC = () => {
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <SettingsIcon size={24} style={{ color: "#2962ff" }} />
           <div>
-            <h2 style={{ margin: 0, fontSize: "20px", color: "#f0f3fa" }}>Platform & Delta Exchange Settings</h2>
+            <h2 style={{ margin: 0, fontSize: "20px", color: "#f0f3fa" }}>Platform & Backend Server Settings</h2>
             <div style={{ fontSize: "12px", color: "#787b86" }}>
-              Configure and persist your Delta Exchange API credentials and trading preferences
+              Configure persistent server connectivity, Delta Exchange API credentials, and default trading parameters
             </div>
           </div>
         </div>
@@ -136,12 +212,85 @@ export const SettingsTab: React.FC = () => {
         )}
       </div>
 
+      {/* 0. BACKEND API SERVER CONNECTIVITY CARD */}
+      <div className="tv-panel">
+        <div className="tv-panel-header">
+          <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <Globe size={15} style={{ color: "#00E676" }} /> 1. Deployed Backend Server Connection (Persistent)
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {serverHealth?.ok ? (
+              <span style={{ color: "#089981", fontSize: "11px", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px" }}>
+                <CheckCircle2 size={13} /> Server Online ({serverHealth.ip})
+              </span>
+            ) : serverHealth?.ok === false ? (
+              <span style={{ color: "#f23645", fontSize: "11px", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px" }}>
+                <XCircle size={13} /> Server Offline ({serverHealth.error})
+              </span>
+            ) : (
+              <span style={{ color: "#787b86", fontSize: "11px" }}>Active: {getApiUrl()}</span>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div className="form-group">
+            <label>Backend API Base URL</label>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. https://stellar-stock-backend.onrender.com or http://localhost:8000"
+                value={backendUrl}
+                onChange={(e) => setBackendUrl(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleSaveBackendUrl}
+                style={{ width: "auto", padding: "0 18px", whiteSpace: "nowrap", fontSize: "12px" }}
+              >
+                Save URL
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleResetBackendUrl}
+                title="Reset to default build URL"
+                style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", whiteSpace: "nowrap" }}
+              >
+                <RotateCcw size={13} /> Reset
+              </button>
+            </div>
+            <div style={{ fontSize: "11px", color: "#787b86", marginTop: "4px" }}>
+              Saved in your browser storage (`localStorage`). If you deploy to Vercel/Netlify, paste your live backend URL here so the frontend communicates with your server across reloads.
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={handleTestBackendServer}
+              disabled={isCheckingServer}
+              style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "6px 14px" }}
+            >
+              <RefreshCw size={13} className={isCheckingServer ? "spin" : ""} />
+              {isCheckingServer ? "Testing Backend Health..." : "Test Server Health"}
+            </button>
+            {serverMsg && (
+              <span style={{ fontSize: "12px", color: "#00E676" }}>{serverMsg}</span>
+            )}
+          </div>
+        </div>
+      </div>
+
       <form onSubmit={handleSaveSettings} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
         {/* 1. DELTA EXCHANGE CREDENTIALS CARD */}
         <div className="tv-panel">
           <div className="tv-panel-header">
             <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <Key size={15} style={{ color: "#2962ff" }} /> 1. Delta Exchange API Credentials
+              <Key size={15} style={{ color: "#2962ff" }} /> 2. Delta Exchange API Credentials
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               {connResult?.authenticated ? (

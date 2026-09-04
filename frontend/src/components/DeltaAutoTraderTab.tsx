@@ -7,17 +7,30 @@ interface DeltaAutoTraderTabProps {
 }
 
 export const DeltaAutoTraderTab: React.FC<DeltaAutoTraderTabProps> = ({ activeSymbol }) => {
-  // Config state
-  const [apiKey, setApiKey] = useState("");
+  // Config state with localStorage fallbacks
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem("stellar_delta_api_key") || "");
   const [apiSecret, setApiSecret] = useState("");
   const [showSecret, setShowSecret] = useState(false);
-  const [environment, setEnvironment] = useState<"testnet" | "global" | "india">("testnet");
-  const [asset, setAsset] = useState(activeSymbol || "BTC/USDT");
-  const [timeframe, setTimeframe] = useState("1h");
-  const [instrumentType, setInstrumentType] = useState<"options" | "futures">("options");
-  const [sizeContracts, setSizeContracts] = useState(1);
-  const [strikeOffset, setStrikeOffset] = useState(0);
-  const [stopLossPct, setStopLossPct] = useState(50);
+  const [environment, setEnvironment] = useState<"testnet" | "global" | "india">(() => {
+    return (localStorage.getItem("stellar_delta_environment") as any) || "testnet";
+  });
+  const [asset, setAsset] = useState(() => localStorage.getItem("stellar_default_asset") || activeSymbol || "BTC/USDT");
+  const [timeframe, setTimeframe] = useState(() => localStorage.getItem("stellar_default_tf") || "1h");
+  const [instrumentType, setInstrumentType] = useState<"options" | "futures">(() => {
+    return (localStorage.getItem("stellar_default_instrument") as any) || "options";
+  });
+  const [sizeContracts, setSizeContracts] = useState(() => {
+    const s = localStorage.getItem("stellar_default_size");
+    return s ? parseInt(s) : 1;
+  });
+  const [strikeOffset, setStrikeOffset] = useState(() => {
+    const s = localStorage.getItem("stellar_default_strike_offset");
+    return s !== null ? parseInt(s) : 0;
+  });
+  const [stopLossPct, setStopLossPct] = useState(() => {
+    const s = localStorage.getItem("stellar_default_sl");
+    return s ? parseFloat(s) : 50;
+  });
   const [isEnabled, setIsEnabled] = useState(false);
 
   // Status & Positions state

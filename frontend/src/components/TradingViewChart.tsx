@@ -34,14 +34,37 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({ candles, sym
   const chartRef = useRef<IChartApi | null>(null);
   const volumeChartRef = useRef<IChartApi | null>(null);
 
-  // Overlay visibility states
-  const [showEMA9, setShowEMA9] = useState(true);
-  const [showEMA21, setShowEMA21] = useState(true);
-  const [showEMA200, setShowEMA200] = useState(false);
-  const [showSupertrend, setShowSupertrend] = useState(true);
-  const [showRangeFilter, setShowRangeFilter] = useState(true);
-  const [showBB, setShowBB] = useState(false);
-  const [showVWAP, setShowVWAP] = useState(false);
+  // Load saved overlay visibility states
+  const savedIndicators = (() => {
+    try {
+      const saved = localStorage.getItem("stellar_chart_indicators");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {};
+  })();
+
+  const [showEMA9, setShowEMA9] = useState<boolean>(savedIndicators.showEMA9 !== undefined ? savedIndicators.showEMA9 : true);
+  const [showEMA21, setShowEMA21] = useState<boolean>(savedIndicators.showEMA21 !== undefined ? savedIndicators.showEMA21 : true);
+  const [showEMA200, setShowEMA200] = useState<boolean>(savedIndicators.showEMA200 !== undefined ? savedIndicators.showEMA200 : false);
+  const [showSupertrend, setShowSupertrend] = useState<boolean>(savedIndicators.showSupertrend !== undefined ? savedIndicators.showSupertrend : true);
+  const [showRangeFilter, setShowRangeFilter] = useState<boolean>(savedIndicators.showRangeFilter !== undefined ? savedIndicators.showRangeFilter : true);
+  const [showBB, setShowBB] = useState<boolean>(savedIndicators.showBB !== undefined ? savedIndicators.showBB : false);
+  const [showVWAP, setShowVWAP] = useState<boolean>(savedIndicators.showVWAP !== undefined ? savedIndicators.showVWAP : false);
+
+  // Sync indicator settings to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("stellar_chart_indicators", JSON.stringify({
+        showEMA9,
+        showEMA21,
+        showEMA200,
+        showSupertrend,
+        showRangeFilter,
+        showBB,
+        showVWAP
+      }));
+    } catch (e) {}
+  }, [showEMA9, showEMA21, showEMA200, showSupertrend, showRangeFilter, showBB, showVWAP]);
 
   // Series references
   const candSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);

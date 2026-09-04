@@ -22,13 +22,21 @@ export const VoiceAlertsTab: React.FC<VoiceAlertsTabProps> = ({ activeSymbol }) 
   const [calls, setCalls] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Test Call state
-  const [testPhone, setTestPhone] = useState("+91");
+  // Test Call state with localStorage persistence
+  const [testPhone, setTestPhone] = useState(() => {
+    return localStorage.getItem("stellar_voice_test_phone") || "+91";
+  });
   const [testAsset, setTestAsset] = useState(activeSymbol || "BTC/USDT");
   const [testSignal, setTestSignal] = useState<"BUY" | "SELL">("BUY");
   const [testTimeframe, setTestTimeframe] = useState("1h");
   const [isCalling, setIsCalling] = useState(false);
   const [callFeedback, setCallFeedback] = useState<any>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("stellar_voice_test_phone", testPhone);
+    } catch (e) {}
+  }, [testPhone]);
 
   // Add Subscriber Form state
   const [showAddModal, setShowAddModal] = useState(false);
