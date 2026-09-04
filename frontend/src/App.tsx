@@ -37,7 +37,7 @@ interface TickerItem {
   volume: number;
 }
 
-const API_URL = "http://localhost:8000";
+import { API_URL } from "./config";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"terminal" | "indicators" | "copilot" | "news" | "delta" | "holdings" | "settings">("terminal");

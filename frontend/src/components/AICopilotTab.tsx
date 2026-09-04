@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Sparkles, Send, Bot, User, Copy, Check, Award } from "lucide-react";
+import { API_URL } from "../config";
 
 interface AICopilotTabProps {
   analysisData: any;
@@ -49,7 +50,7 @@ export const AICopilotTab: React.FC<AICopilotTabProps> = ({ analysisData, active
     setIsSending(true);
 
     try {
-      const res = await fetch("http://localhost:8000/api/ai-copilot", {
+      const res = await fetch(`${API_URL}/api/ai-copilot`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

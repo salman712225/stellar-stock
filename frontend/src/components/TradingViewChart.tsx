@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createChart, CandlestickSeries, LineSeries, HistogramSeries, createSeriesMarkers } from "lightweight-charts";
 import type { IChartApi, ISeriesApi, UTCTimestamp, SeriesMarker } from "lightweight-charts";
+import { getWsUrl } from "../config";
 
 interface CandleData {
   datetime: string;
@@ -222,7 +223,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({ candles, sym
     priceChart.timeScale().fitContent();
 
     // 6. WebSocket Live Ticker
-    const wsUrl = `ws://localhost:8000/api/ws/${symbol}`;
+    const wsUrl = getWsUrl(`/api/ws/${symbol}`);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 

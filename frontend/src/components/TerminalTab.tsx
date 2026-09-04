@@ -3,6 +3,7 @@ import { RefreshCw, Sparkles, Play, ChevronDown, ChevronUp, Target, TrendingUp }
 import { TradingViewChart } from "./TradingViewChart";
 import { ConsensusGauge } from "./ConsensusGauge";
 import { SizingPlanner } from "./SizingPlanner";
+import { API_URL } from "../config";
 
 interface TerminalTabProps {
   isLoading: boolean;
@@ -64,7 +65,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({
   useEffect(() => {
     const fetchMtf = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/api/multi-timeframe?symbol=${encodeURIComponent(activeSymbol)}`);
+        const res = await fetch(`${API_URL}/api/multi-timeframe?symbol=${encodeURIComponent(activeSymbol)}`);
         if (res.ok) {
           const data = await res.json();
           setMtfData(data);

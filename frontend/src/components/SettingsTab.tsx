@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Settings as SettingsIcon, Key, ShieldCheck, CheckCircle2, XCircle, RefreshCw, Eye, EyeOff, Save } from "lucide-react";
-
-const API_URL = "http://localhost:8000";
+import { API_URL } from "../config";
 
 export const SettingsTab: React.FC = () => {
   // Delta Credentials & Settings

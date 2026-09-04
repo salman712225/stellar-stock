@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Bot, Power, ShieldAlert, Key, Zap, CheckCircle2, XCircle, RefreshCw, Play, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { API_URL } from "../config";
 
 interface DeltaAutoTraderTabProps {
   activeSymbol: string;
 }
-
-const API_URL = "http://localhost:8000";
 
 export const DeltaAutoTraderTab: React.FC<DeltaAutoTraderTabProps> = ({ activeSymbol }) => {
   // Config state
