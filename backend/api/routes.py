@@ -70,6 +70,21 @@ class AICopilotRequest(BaseModel):
     question: str
     context: Optional[Dict[str, Any]] = None
 
+@router.get("/api/server-ip")
+async def get_server_ip():
+    """
+    Returns the public outbound IP address of this backend server for Delta Exchange IP whitelisting.
+    """
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("https://api.ipify.org?format=json", timeout=5.0)
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception as e:
+        return {"error": str(e)}
+    return {"ip": "Unknown"}
+
 @router.get("/api/market-overview")
 async def get_market_overview():
     """
