@@ -3,16 +3,10 @@ uvicorn
 motor
 pymongo
 python-dotenv
-
 ccxt
-
 pandas
 numpy
-plotly
-streamlit
-
 scikit-learn
-
 requests
 newsapi-python
 feedparser

@@ -1,3 +1,4 @@
+import gc
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
@@ -220,7 +221,7 @@ async def analyze_symbol(symbol: str, timeframe: str = "1h", limit: int = 200):
     fear_greed_score = int(np.clip(50 + (sentiment_score * 30) + ((latest_indicators["rsi_14"] - 50) * 0.4), 5, 95))
     fear_greed_label = "Extreme Greed" if fear_greed_score >= 75 else "Greed" if fear_greed_score >= 55 else "Extreme Fear" if fear_greed_score <= 25 else "Fear" if fear_greed_score <= 45 else "Neutral"
 
-    return clean_json_data({
+    response_payload = clean_json_data({
         "symbol": symbol,
         "timeframe": timeframe,
         "current_price": latest_close,
@@ -260,6 +261,12 @@ async def analyze_symbol(symbol: str, timeframe: str = "1h", limit: int = 200):
         "report": report,
         "chart_data": chart_candles
     })
+
+    # Explicit memory cleanup
+    del df, df_enriched, smc_data, sentiment_data, chart_candles
+    gc.collect()
+
+    return response_payload
 
 @router.post("/api/ai-copilot")
 async def ai_copilot_chat(req: AICopilotRequest):
@@ -330,6 +337,9 @@ async def get_multi_timeframe(symbol: str):
     bull_pct = round((bullish_votes / total_valid) * 100, 1)
     overall_confluence = "STRONG BULLISH" if bull_pct >= 80 else "BULLISH" if bull_pct >= 60 else "STRONG BEARISH" if bull_pct <= 20 else "BEARISH" if bull_pct <= 40 else "CONSOLIDATING"
     
+    del tf_data
+    gc.collect()
+
     return clean_json_data({
         "symbol": symbol,
         "overall_confluence": overall_confluence,
@@ -475,6 +485,9 @@ async def scan_range_filter_signals():
         
     tasks = [scan_single(sym) for sym in symbols]
     scanned = await asyncio.gather(*tasks)
-    return clean_json_data([s for s in scanned if s])
+    result = clean_json_data([s for s in scanned if s])
+    del tasks, scanned
+    gc.collect()
+    return result
 
 

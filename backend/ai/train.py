@@ -42,8 +42,8 @@ def train_model(
             X_train_full, y_train_full, test_size=0.2, random_state=42, shuffle=False
         )
 
-        # Initialize and fit model
-        model = RandomForestClassifier(n_estimators=100, max_depth=8, random_state=42)
+        # Initialize and fit lightweight model (low memory footprint, single thread)
+        model = RandomForestClassifier(n_estimators=15, max_depth=4, random_state=42, n_jobs=1)
         model.fit(X_train, y_train)
 
         # Evaluate model
@@ -56,6 +56,11 @@ def train_model(
         
         with open(model_path, "wb") as f:
             pickle.dump(model, f)
+
+        # Free temporary training memory
+        del X_train, X_test, y_train, y_test, X_train_full, y_train_full, X, y
+        import gc
+        gc.collect()
 
         logger.info(f"Model trained for {symbol} with test accuracy {accuracy:.4f}")
         

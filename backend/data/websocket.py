@@ -3,7 +3,6 @@ import json
 import logging
 from typing import Dict, Set, Callable, Any
 import httpx
-import ccxt.async_support as ccxt_async
 from config import DEFAULT_CRYPTO_SYMBOLS, DEFAULT_FO_SYMBOLS
 
 logger = logging.getLogger("websocket_feed")
@@ -13,25 +12,14 @@ class RealtimeMarketDataFeed:
         self.subscribers: Dict[str, Set[asyncio.Queue]] = {}
         self.active_tasks: Dict[str, asyncio.Task] = {}
         self.is_running = False
-        self.exchange = None
 
     async def start(self):
         self.is_running = True
-        try:
-            self.exchange = ccxt_async.binance({
-                'enableRateLimit': True,
-                'options': {'defaultType': 'future'}
-            })
-        except Exception as e:
-            logger.error(f"Failed to initialize async CCXT: {e}")
-            self.exchange = None
 
     async def stop(self):
         self.is_running = False
         for symbol, task in list(self.active_tasks.items()):
             task.cancel()
-        if self.exchange:
-            await self.exchange.close()
         logger.info("Real-time feed stopped.")
 
     async def subscribe(self, symbol: str, queue: asyncio.Queue):
@@ -66,16 +54,19 @@ class RealtimeMarketDataFeed:
                 price_data = None
                 try:
                     if is_crypto:
-                        if self.exchange:
-                            ticker = await self.exchange.fetch_ticker(symbol)
+                        clean = symbol.replace("/", "").replace("-", "").upper()
+                        url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={clean}"
+                        response = await async_client.get(url, timeout=4.0)
+                        if response.status_code == 200:
+                            data = response.json()
                             price_data = {
                                 "symbol": symbol,
-                                "price": ticker.get("last"),
-                                "bid": ticker.get("bid"),
-                                "ask": ticker.get("ask"),
-                                "change_24h": ticker.get("percentage"),
-                                "volume_24h": ticker.get("baseVolume"),
-                                "timestamp": ticker.get("timestamp")
+                                "price": float(data.get("lastPrice", 0)),
+                                "bid": float(data.get("bidPrice", 0)),
+                                "ask": float(data.get("askPrice", 0)),
+                                "change_24h": float(data.get("priceChangePercent", 0)),
+                                "volume_24h": float(data.get("volume", 0)),
+                                "timestamp": int(data.get("closeTime", 0))
                             }
                     else:
                         # Fetch quote details from Yahoo Finance
